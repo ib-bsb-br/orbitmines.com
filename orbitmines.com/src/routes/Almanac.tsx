@@ -565,6 +565,51 @@ const Almanac = () => {
 
           They are created by binding a function's context and defining some variables on it.
 
+          Unlike other languages, the entire body of the class is the default constructor, so you don't specify one explicitly.<BR/>
+
+          Anything called on static which doesn't depend on an instance's parameters or which wouldn't be effected by getting called multiple times, gets taken out of the constructor if possible. So the following things aren't actually in the constructor:
+
+          <CodeBlock>
+            class Example<BR/>
+            <></>  static Var = 5<BR/>
+            <></><BR/>
+            <></>  class InnerClass // is automatically called on static
+          </CodeBlock>
+          Things like this (+1) would be part of the constructor:
+          <CodeBlock>
+            class Example<BR/>
+            <></>  static Var = 5<BR/>
+            <BR/>
+            <></>  Var += 1
+          </CodeBlock>
+
+          If you want you can accept any positional argument like a function definition:
+
+          <CodeBlock>
+            class Example (x: String)
+          </CodeBlock>
+          Any variable defined on the type is automatically also part of the constructor, by passing it named to the constructor:
+          <CodeBlock>
+            class Example (x: String)<BR/>
+            <></>  y: String<BR/>
+            <BR/>
+            Example("X", y: "Y")
+          </CodeBlock>
+
+          You'll find that you won't need different constructors as often, as you have access to a very expressive syntax for defining different possible types which match the constructor.<BR/>
+
+          If for sake of code clarity you still want to separate the constructors, you can by overriding the static constructor (you can omit (super) in it, in which case it will run before your defined constructor):
+
+          <CodeBlock>
+            class Example<BR/>
+            <></>  static ()<BR/>
+            <></>    this // is available in this context.<BR/>
+            <BR/>
+            <></>  static (a: String)<BR/>
+            <></>    super(property: a)
+          </CodeBlock>
+
+
           <CodeBlock>
             class Enum {'<'} .A | .B | .C(: String)
           </CodeBlock>
@@ -720,6 +765,7 @@ const Almanac = () => {
             <></>      .compress_zeros<BR/>
             <></>      .lowercase
           </CodeBlock>
+
           Then there is the (~~) operator, which does the exact same thing, but returns the original thing you call the successive functions on. Which is useful for creating one-liners like:
           <CodeBlock>
             mac_address: Binary⁴⁸ =<BR/>
