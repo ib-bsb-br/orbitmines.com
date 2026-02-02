@@ -634,7 +634,7 @@ const Almanac = () => {
         </Section>
       </Section>
       <Section head="§3. Ecosystem">
-        One of the difficult design decisions, was what to do with the whole 'Call by value vs reference' ordeal. By which I mean, should in the following example, (x) get updated:
+        One of the difficult design decisions, was what to do with the whole 'Call by value vs reference' ordeal. By which I mean, should in the following example, (x) get updated:<BR/>
         <CodeBlock>
           class Example (field = "A")<BR/>
           <BR/>
