@@ -634,6 +634,51 @@ const Almanac = () => {
         </Section>
       </Section>
       <Section head="§3. Ecosystem">
+        One of the difficult design decisions, was what to do with the whole 'Call by value vs reference' ordeal. By which I mean, should in the following example, (x) get updated:
+        <CodeBlock>
+          class Example (field = "A")<BR/>
+          <BR/>
+          x = Example()<BR/>
+          <BR/>
+          update(var: Example)<BR/>
+          <></>  var = Example("B")<BR/>
+          <BR/>
+          update(x)<BR/>
+          x.field // Is it "A" or "B" here?
+        </CodeBlock>
+        Saying it is always "Call by reference" would mean it is "B" here, saying "Call by value" would mean it's always "A" and that it's impossible to modify an object other than returning a new version.
+        <BR/>
+        <span style={{textAlign: 'left'}}>In most modern programming languages it is: Assignment, so (=), is actually reassignment of that variable in scope: And shouldn't effect the variable out of scope. But then suddenly other mutations of that object don't qualify under this distinction.<span className="bp5-text-muted"> In the Ray programming language, any mutation is an assignment (=) somewhere in the structure.</span></span><BR/>
+        To me it seems kind of arbitrary that one is a more dangerous ground for bugs than the other.<BR/>
+        Whatever the reason, there currently exists a certain expectation of what kind of mutation should apply out of scope, and which shouldn't. Going for the option of making everything "Call by reference" would surely lead to many bugs in the language; Another approach is required.
+        <BR/>
+        <BR/>
+        <BR/>
+        <BR/>
+        <BR/>
+        Instead we default to "Always call by value", and in this chapter we introduce the idea of variable versions, and variable locations. As one of its uses you can determine to which version and location the mutation should apply.<BR/>
+        Which in the above example would be done with the location (@) operator combined with ({'<'}-) as to indicate that it should be updated in the whole callstack which led to this function and its own context:
+        <CodeBlock>
+          update(var: Example)<BR/>
+          <></>  var @ {'<'}- = Example("B")
+        </CodeBlock>
+        You can also put this on the parameters, with the same effect:
+        <CodeBlock>
+          update(var @ {'<'}-: Example)<BR/>
+          <></>  var = Example("B")
+        </CodeBlock>
+        <span className="bp5-text-disabled" style={{textAlign: 'left'}}>Note that in a concurrent setting, you can also turn that arrow around (-{'>'}) to view & edit the variable in any thread you gave the variable to.</span>
+        Or if we want to only update the caller's context.
+        <CodeBlock>
+          var @ &caller = Example("B")
+        </CodeBlock>
+        Or, as we'll introduce later in this chapter, we might even want to update it in all locations, whether that is some remote location like a database or mirror of that data. We can use (*) to select all locations:
+        <CodeBlock>
+          var @ * = Example("B")
+        </CodeBlock>
+
+        Let's start by exploring how these locations work.
+
         <Section head="§3.1 Location & Assignment">
 
         </Section>
