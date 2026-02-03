@@ -752,6 +752,8 @@ const Almanac = () => {
 
         </Section>
         <Section head="§4.5 Punctuation">
+          {/* //Allow returning out of a -- statement. */}
+
           The familiar parenthesis () are used to group certain kinds of operations, to prefer a particular interpretation over another. The Ray programming language extends this notion a little further than most programming languages. Where you're allowed to introduce parenthesis pretty much anywhere, and there's a valid interpretation of what that means.
 
           <BR/>
@@ -781,6 +783,13 @@ const Almanac = () => {
           <BR/>
 
           The Ray programming language is also pretty lenient in it's omittance of parenthesis and allowance for spaces as punctuation.<BR/>
+
+          After a superposed variable, you can omit parenthesis by using a space to go straight to its type or call any other method on it:
+          <CodeBlock>
+            A | B : String<BR/>
+            A | B .method<BR/>
+            A | B {'{'}length == 2{'}'}
+          </CodeBlock>
 
           You can omit the use of (.) in favor for a space, as is usually already the case for special character operators, but in Ray you can also do this with any property:
 
