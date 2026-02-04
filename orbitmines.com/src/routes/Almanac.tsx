@@ -460,7 +460,7 @@ const Almanac = () => {
 
         </Section>
         <Section head="§2.4 Types: Patterns">
-          {/* Filters, > None, Dependent on other in structure, dependent type with .match or if statement, Ambiguities of patterns like varargs, Ambiguity what? */}
+          {/* Filters, > None, Dependent on other in structure, dependent type with .match or if statement, Ambiguities of patterns like varargs, Ambiguity what?, Dependent types left/right right is more expensive */}
           <CodeBlock>
             "A"[]
           </CodeBlock>
@@ -573,7 +573,7 @@ const Almanac = () => {
             class Example<BR/>
             <></>  static Var = 5<BR/>
             <></><BR/>
-            <></>  class InnerClass // is automatically called on static
+            <></>  static class InnerClass
           </CodeBlock>
           Things like this (+1) would be part of the constructor:
           <CodeBlock>
@@ -752,7 +752,7 @@ const Almanac = () => {
 
         </Section>
         <Section head="§4.5 Punctuation">
-          {/* //Allow returning out of a -- statement. */}
+          {/* //Allow returning out of a -- statement., Allow any kind of statement in <>,[],{},() as long as the return is what we're looking for. */}
 
           The familiar parenthesis () are used to group certain kinds of operations, to prefer a particular interpretation over another. The Ray programming language extends this notion a little further than most programming languages. Where you're allowed to introduce parenthesis pretty much anywhere, and there's a valid interpretation of what that means.
 
