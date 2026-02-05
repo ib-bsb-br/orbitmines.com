@@ -460,7 +460,8 @@ const Almanac = () => {
 
         </Section>
         <Section head="§2.4 Types: Patterns">
-          {/* Filters, > None, Dependent on other in structure, dependent type with .match or if statement, Ambiguities of patterns like varargs, Ambiguity what?, Dependent types left/right right is more expensive */}
+          {/* Filters, > None, Dependent on other in structure, dependent type with .match or if statement, Ambiguities of patterns like varargs, Ambiguity what?, Dependent types left/right right is more expensive,
+           */}
           <CodeBlock>
             "A"[]
           </CodeBlock>
@@ -841,7 +842,30 @@ const Almanac = () => {
 
         </Section>
       </Section>
-      <Section head="§6. The Compiler">
+      <Section head="§6. The v0 Runtime & Compiler">
+        <Section head="§6.1 Self-modifying Types">
+          In order to understand the runtime, we must first extend the fundamentals with one more concept; a further generalization of dependent types: self-modifying types.
+          <BR/>
+          While dependent types are incredibly useful, in both looking ahead or behind in a pattern, there is one thing that they typically can't do. Which is to express a pattern which arbitrarily modifies itself.
+          <BR/>
+          The idea is simple enough to understand: Something is found in the pattern, which changes the pattern arbitrarily: How should one interpret what happens next?; Should you reinterpret the whole thing? Should you only reinterpret what comes next? That's the question we explore in this section.
+          <BR/>
+          <span className="bp5-text-muted" style={{textAlign: 'left'}}>
+            This concept is pretty general and can be applied to everything (like for instance our self-modifying functions which alter its own control-flow). In the context of languages, this self-modifying behavior is known as an <Reference is="reference" index={referenceCounter()} reference={{title: "Adaptive grammar", link: "https://en.wikipedia.org/wiki/Adaptive_grammar"}} simple inline />. And I'm here equivalencing the meaning of a pattern/type/grammar.
+          </span>
+          <BR/>
+          The Ray programming language uses such an adaptive grammar (or self-modifying type), and usual type matching also supports it!<BR/>
+          Throughout the standard library you might find definitions for additional syntax like:
+          <CodeBlock>
+            `An example` // Can also be used in front of definitions<BR/>
+            <BR/>
+            `{'{'}string: String{'}'}` ={'>'} string<BR/>
+            <BR/>
+            `An example` // Valid syntax
+          </CodeBlock>
+          Let's get started on the definition of expressions in the language to understand how that works:
+
+        </Section>
       </Section>
       <Section head="§7. Other Features">
         <Section head="§7.1 (Unicode) Strings">
