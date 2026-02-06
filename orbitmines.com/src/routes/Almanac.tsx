@@ -765,11 +765,11 @@ const Almanac = () => {
           </CodeBlock>
           You might do this:
           <CodeBlock>
-            var (condition ? == 5 : {'<'}= 5)
+            var.(condition ? == 5 : {'<'}= 5)
           </CodeBlock>
           Or even:
           <CodeBlock>
-            var (condition ? == : {'<'}=) 5
+            var.(condition ? == : {'<'}=) 5
           </CodeBlock>
 
           The same can be done with property getters, so you can have things like:
@@ -777,6 +777,8 @@ const Almanac = () => {
             Symbol: Char = Unicode.GeneralCategory.(Punctuation | Symbol)
           </CodeBlock>
           Which superposes both properties with the (|) operator.
+          <BR/>
+          <span className="bp5-text-muted" style={{textAlign: 'left'}}>Note that anything within parenthesis is always a <Reference is="reference" simple inline index={referenceCounter()} reference={{title: 'closure', link: 'https://en.wikipedia.org/wiki/Closure_(computer_programming)'}} />. In it, the entire variable you're accessing is loaded in the context. So if it defines a (.next) method, and your scope also has a (.next) method, the .next from the object is used! This could be unexpected behavior.</span>
 
           <BR/>
           <BR/>
