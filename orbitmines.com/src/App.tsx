@@ -9,6 +9,7 @@ import {Children, ThumbnailPage} from "./lib/post/Post";
 import Archive from "./routes/Archive";
 import Minimap from './routes/Minimap';
 import Almanac from "./routes/Almanac";
+import Library from "./routes/Library";
 
 export const Router = () => {
 
@@ -22,6 +23,7 @@ export const Router = () => {
       <Route path=":item" element={<Archive />} />
     </Route>
     <Route path="almanac" element={<Almanac />} />
+    <Route path="library" element={<Library />} />
     <Route path="thumbnail" element={<ThumbnailPage />} />
   </Routes>
 }

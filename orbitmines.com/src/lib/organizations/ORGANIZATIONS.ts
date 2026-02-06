@@ -73,7 +73,7 @@ export type Content = {
 export type TProfile = {
   first_name?: string,
   last_name?: string,
-  name: string,
+  name?: string,
   formal_citation_name?: string,
 
   date?: string,
