@@ -772,6 +772,8 @@ const Almanac = () => {
             var.(condition ? == : {'<'}=) 5
           </CodeBlock>
 
+          <span className="bp5-text-muted" style={{textAlign: 'left'}}>Note that you have to include a preceding (.), as the syntax for [ ()] is reserved for for function definitions.</span><BR/>
+
           The same can be done with property getters, so you can have things like:
           <CodeBlock>
             Symbol: Char = Unicode.GeneralCategory.(Punctuation | Symbol)
