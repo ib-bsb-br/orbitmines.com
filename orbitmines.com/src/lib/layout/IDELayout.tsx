@@ -238,7 +238,7 @@ function findSmallestBelowThreshold(
     if (
       node.children[i].type === 'tabgroup' &&
       childPx < threshold &&
-      childPx < smallestPx
+      childPx <= smallestPx
     ) {
       smallestPx = childPx;
       smallestIndex = i;
@@ -621,7 +621,6 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const tabBarRef = useRef<HTMLDivElement>(null);
 
-  const activePanel = panelRegistry.get(node.panels[node.activeIndex]);
   const isDropTarget = dropZone && dropZone.targetId === node.id;
 
   const computeTabInsertIndex = useCallback(
@@ -825,9 +824,19 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
         {tabElements}
       </div>
 
-      <div className="ide-panel-content">
-        {activePanel ? activePanel.render() : null}
-      </div>
+      {node.panels.map((panelId, i) => {
+        const panel = panelRegistry.get(panelId);
+        if (!panel) return null;
+        return (
+          <div
+            key={panelId}
+            className="ide-panel-content"
+            style={i !== node.activeIndex ? { display: 'none' } : undefined}
+          >
+            {panel.render()}
+          </div>
+        );
+      })}
 
       {isDropTarget && dropZone!.type !== 'tab' && (
         <DropIndicator type={dropZone!.type} />

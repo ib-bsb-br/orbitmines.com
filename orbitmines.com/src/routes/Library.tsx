@@ -17,92 +17,218 @@ const Socials = ({ profile }: { profile: TProfile }) => {
   </Row>
 }
 
-const Language = ({children}: Children) => {
+// ─── Project Data Model ──────────────────────────────────────────────────────
+
+interface ProjectEntry {
+  name: string;
+  icon?: string;
+  version?: string;
+  language?: string;
+  children?: ProjectChild[];
+}
+
+type ProjectChild = FileChild | LibrariesChild;
+
+interface FileChild {
+  type: 'file';
+  name: string;
+  icon?: string;
+  version?: string;
+  language?: string;
+  disabled?: boolean;
+  snippet?: string;
+  reference?: { name: string; icon?: string };
+}
+
+interface LibrariesChild {
+  type: 'libraries';
+  count?: number;
+  entries: LibraryEntryData[];
+}
+
+interface LibraryEntryData {
+  name: string;
+  icon?: string;
+  snippet?: string;
+  reference?: { name: string; icon?: string };
+}
+
+// ─── Dataset ─────────────────────────────────────────────────────────────────
+
+const PROJECTS: ProjectEntry[] = [
+  {
+    name: 'Ray',
+    version: 'v1.0.0',
+    language: 'Language',
+    children: [
+      {
+        type: 'file',
+        name: 'UUID.ray',
+        icon: 'document',
+        disabled: true,
+        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+      },
+      {
+        type: 'libraries',
+        count: 10000,
+        entries: [
+          {
+            name: 'Library',
+            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+          },
+          {
+            name: 'Library',
+            reference: { name: 'Language' },
+            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'Set Theory',
+    children: [
+      {
+        type: 'file',
+        name: 'set.mm',
+        version: 'v1.0.0',
+        language: 'Language',
+        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+      },
+    ],
+  },
+  {
+    name: 'UUID',
+    version: 'v1.0.0',
+    language: 'Language',
+    children: [
+      {
+        type: 'file',
+        name: 'Ray // UUID.ray',
+        version: 'v1.0.0',
+        language: 'Language',
+        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+      },
+    ],
+  },
+];
+
+// ─── Rendering Components ────────────────────────────────────────────────────
+
+const snippetStyle = {width: '100%', fontSize: '12px', padding: '10px', margin: '5px'};
+
+const Language = ({children, version, language}: Children & { version?: string; language?: string }) => {
+  const hasControls = version || language;
   return <>
     <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
       <Row middle="xs" className="child-pr-3">
         {children}
       </Row>
     </Button>
-    <Col>
+    {hasControls && <Col>
       <Row>
         <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
         <Col>
-          <Row center="xs">
+          {version && <Row center="xs">
             <Button minimal className="pb-0">
               <Row center="xs" middle="xs" className="bp5-text-muted">
-                <Icon icon="git-branch" className="pr-3" size={12}/><h5>v1.0.0</h5><Icon icon="caret-down" />
+                <Icon icon="git-branch" className="pr-3" size={12}/><h5>{version}</h5><Icon icon="caret-down" />
               </Row>
             </Button>
-          </Row>
-          <Row center="xs" middle="xs">
+          </Row>}
+          {language && <Row center="xs" middle="xs">
             <Button minimal style={{fontSize: '10px', height: '100%'}} icon={<Icon icon="circle" size={10} />} className="p-0">
-              Language
+              {language}
             </Button>
-          </Row>
+          </Row>}
         </Col>
       </Row>
-    </Col>
+    </Col>}
   </>
 }
 
-const ProjectList = () => <>
-  <Row middle="xs" between="xs">
-    <Language>
-      <Icon icon="circle" size={16} />
-      <h3>Ray</h3>
-    </Language>
+const Snippet = ({ text }: { text: string }) =>
+  <Block style={snippetStyle}>{text}</Block>
+
+const LibraryEntryView = ({ entry }: { entry: LibraryEntryData }) => {
+  const icon = entry.icon || 'circle';
+  return <>
+    <Row middle="xs" className="child-pr-3">
+      <Icon icon={icon as any} size={14} />
+      {entry.reference
+        ? <><span>{entry.name} <span className="bp5-text-muted">-{'>'}</span></span><Icon icon={(entry.reference.icon || 'circle') as any} size={14} />{entry.reference.name}</>
+        : entry.name
+      }
+    </Row>
+    {entry.snippet && <Snippet text={entry.snippet} />}
+  </>;
+}
+
+const LibrariesView = ({ data }: { data: LibrariesChild }) => <>
+  <Row middle="xs" className="child-pr-3">
+    <Icon icon="git-repo" size={14} />
+    <span>Libraries{data.count !== undefined && <span className="bp5-text-muted"> ({data.count.toLocaleString()})</span>}</span>
   </Row>
-  <Row>
-    <Col xs={12} className="pl-8">
-      <Row middle="xs" className="child-pr-3"><Icon icon="document" size={14} className="bp5-text-disabled" /><span className="bp5-text-disabled">UUID.ray</span></Row>
-      <Block style={{width: '100%', fontSize: '12px', padding: '10px', margin: '5px'}}>UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"</Block>
-
-      <Row middle="xs" className="child-pr-3"><Icon icon="git-repo" size={14} /><span>Libraries <span className="bp5-text-muted">(10,000)</span></span></Row>
-
-      <Row className="pl-8">
-        <Row middle="xs" className="child-pr-3"><Icon icon="circle" size={14} />Library</Row>
-        <Block style={{width: '100%', fontSize: '12px', padding: '10px', margin: '5px'}}>UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"</Block>
-        <Row middle="xs" className="child-pr-3"><Icon icon="circle" size={14} /><span>Library <span className="bp5-text-muted">-{'>'}</span></span><Icon icon="circle" size={14} />Language</Row>
-        <Block style={{width: '100%', fontSize: '12px', padding: '10px', margin: '5px'}}>UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"</Block>
-      </Row>
-
-    </Col>
+  <Row className="pl-8">
+    {data.entries.map((entry, i) =>
+      <LibraryEntryView key={i} entry={entry} />
+    )}
   </Row>
+</>
 
-  <Row middle="xs" between="xs">
-    <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
+const FileChildView = ({ file }: { file: FileChild }) => {
+  const icon = file.icon || 'circle';
+  const hasControls = file.version || file.language;
+  return <>
+    {hasControls ? (
+      <Row><Language version={file.version} language={file.language}>
+        <Icon icon={icon as any} size={14} /><span>{file.name}</span>
+      </Language></Row>
+    ) : (
       <Row middle="xs" className="child-pr-3">
-        <Icon icon="circle" size={16} />
-        <h3>Set Theory</h3>
+        <Icon icon={icon as any} size={14} className={file.disabled ? 'bp5-text-disabled' : ''} />
+        <span className={file.disabled ? 'bp5-text-disabled' : ''}>{file.name}</span>
       </Row>
-    </Button>
-    {/*<Button minimal>*/}
-    {/*  <Row middle="xs" className="bp5-text-muted">*/}
-    {/*    <Icon icon="git-branch" className="pr-3" size={12}/><h5>v1.0.0</h5><Icon icon="caret-down" />*/}
-    {/*  </Row>*/}
-    {/*</Button>*/}
-  </Row>
-  <Row>
-    <Col xs={12} className="p-0 pl-8">
-      <Row><Language><Icon icon="circle" size={14} /><span>set.mm</span></Language></Row>
-      <Block style={{width: '100%', fontSize: '12px', padding: '10px', margin: '5px'}}>UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"</Block>
-    </Col>
-  </Row>
-  <Row middle="xs" between="xs">
-    <Language>
-      <Icon icon="circle" size={16} />
-      <h3>UUID</h3>
-    </Language>
-  {/* No implementation language; or English, but versioned. */}
-  </Row>
-  <Row>
-    {/* Version of file / class. */}
-    <Col xs={12} className="p-0 pl-8">
-      <Row><Language><Icon icon="circle" size={14} /><span>Ray // UUID.ray</span></Language></Row>
-      <Block style={{width: '100%', fontSize: '12px', padding: '10px', margin: '5px'}}>UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"</Block>
-    </Col>
-  </Row>
+    )}
+    {file.snippet && <Snippet text={file.snippet} />}
+  </>;
+}
+
+const ProjectEntryView = ({ project }: { project: ProjectEntry }) => {
+  const icon = project.icon || 'circle';
+  const hasControls = project.version || project.language;
+  return <>
+    <Row middle="xs" between="xs">
+      {hasControls ? (
+        <Language version={project.version} language={project.language}>
+          <Icon icon={icon as any} size={16} />
+          <h3>{project.name}</h3>
+        </Language>
+      ) : (
+        <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
+          <Row middle="xs" className="child-pr-3">
+            <Icon icon={icon as any} size={16} />
+            <h3>{project.name}</h3>
+          </Row>
+        </Button>
+      )}
+    </Row>
+    {project.children && project.children.length > 0 && <Row>
+      <Col xs={12} className="pl-8">
+        {project.children.map((child, i) =>
+          child.type === 'file'
+            ? <FileChildView key={i} file={child} />
+            : <LibrariesView key={i} data={child} />
+        )}
+      </Col>
+    </Row>}
+  </>;
+}
+
+const ProjectList = ({ projects }: { projects: ProjectEntry[] }) => <>
+  {projects.map((project, i) =>
+    <ProjectEntryView key={i} project={project} />
+  )}
 </>
 
 const SettingsPanel = ({ profile }: { profile: TProfile }) => <>
@@ -124,7 +250,7 @@ const SettingsPanel = ({ profile }: { profile: TProfile }) => <>
     <Col xs={12}><HorizontalLine/></Col>
     <Col xs={12}><h4 className="bp5-text-muted">Selection</h4></Col>
     <Col xs={12}>
-      <ProjectList/>
+      <ProjectList projects={PROJECTS} />
     </Col>
   </Row>
 </>
@@ -152,7 +278,7 @@ const Library = () => {
       id: 'projects',
       title: 'Projects',
       icon: 'git-repo',
-      render: () => <ProjectList />,
+      render: () => <ProjectList projects={PROJECTS} />,
       closable: false,
     },
     {

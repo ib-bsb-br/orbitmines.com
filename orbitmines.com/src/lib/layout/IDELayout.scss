@@ -67,7 +67,7 @@
 
   &:hover,
   &--active {
-    background: $blue3;
+    background: #8abbff;
   }
 }
 
@@ -121,7 +121,7 @@
   &--active {
     color: $light-gray1;
     background: $dark-gray3;
-    border-bottom: 2px solid $blue3;
+    border-bottom: 2px solid #8abbff;
   }
 
   &--dragging {
@@ -171,7 +171,7 @@
 .ide-tab-insert-indicator {
   flex: 0 0 2px;
   align-self: stretch;
-  background: $blue3;
+  background: #8abbff;
 }
 
 // Drop indicator overlay
@@ -179,7 +179,7 @@
   position: absolute;
   pointer-events: none;
   z-index: 100;
-  background: rgba($blue3, 0.2);
-  border: 2px solid rgba($blue3, 0.6);
+  background: rgba(#8abbff, 0.2);
+  border: 2px solid rgba(#8abbff, 0.6);
   transition: all 0.1s ease;
 }
