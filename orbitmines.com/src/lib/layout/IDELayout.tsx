@@ -942,6 +942,7 @@ const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
   const collapseStackRef = useRef<CollapseRecord[]>([]);
+  const collapseGraceRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const panelRegistry = useMemo(() => {
@@ -1147,10 +1148,11 @@ const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
       }
 
       // Phase 2: Collapse — find anything too small
-      // Skip if we just restored panels to avoid bounce (restore then
-      // immediate re-collapse which ratchets collapsedAtDim upward
-      // until the record goes stale and the panel is permanently lost).
-      if (!didRestore) {
+      // Skip if we just restored panels (this event) or restored on the
+      // previous event (grace period) to prevent flicker at the boundary.
+      const skipCollapse = didRestore || collapseGraceRef.current;
+      collapseGraceRef.current = didRestore;
+      if (!skipCollapse) {
         let collapsed = true;
         while (collapsed) {
           collapsed = false;

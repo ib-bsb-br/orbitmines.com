@@ -217,9 +217,9 @@ const EntryName = ({ entry }: { entry: Entry }) => {
     </span>;
   }
   if (entry.reference) {
-    return <span>
-      {entry.name} <span className="bp5-text-muted">-{'>'}</span>{' '}
-      <Icon icon={(entry.reference.icon || 'circle') as any} size={12} />{' '}
+    return <span style={{display: 'inline-flex', alignItems: 'center', gap: '3px'}}>
+      {entry.name} <span className="bp5-text-muted">-{'>'}</span>
+      <Icon icon={(entry.reference.icon || 'circle') as any} size={12} />
       {entry.reference.name}
     </span>;
   }
