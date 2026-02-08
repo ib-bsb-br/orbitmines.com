@@ -1,6 +1,6 @@
 import React, {useMemo, useState} from 'react';
-import {Button, Icon, Menu, MenuItem, Popover} from "@blueprintjs/core";
-import {Block, Children, Col, CustomIcon, HorizontalLine, Row} from "../lib/post/Post";
+import {Button, Icon, Menu, MenuItem, Popover, Tag} from "@blueprintjs/core";
+import {Block, Col, CustomIcon, HorizontalLine, Row} from "../lib/post/Post";
 import {useNavigate} from "react-router-dom";
 import {Helmet} from "react-helmet";
 import ORGANIZATIONS, {TProfile} from "../lib/organizations/ORGANIZATIONS";
@@ -17,37 +17,44 @@ const Socials = ({ profile }: { profile: TProfile }) => {
   </Row>
 }
 
-// ─── Project Data Model ──────────────────────────────────────────────────────
+// ─── Data Model ──────────────────────────────────────────────────────────────
 
-interface VersionInfo {
-  tag: string;
-  language?: string;
-  languageIcon?: string;
+type LanguageRef = string | { name: string; icon?: string };
+
+function resolveLanguageRef(ref?: LanguageRef): { name?: string; icon?: string } {
+  if (!ref) return {};
+  if (typeof ref === 'string') return { name: ref };
+  return ref;
 }
 
-interface ProjectEntry {
+function resolveLanguage(ref?: LanguageRef, defaultRef?: LanguageRef): { name: string; icon: string } {
+  const resolved = resolveLanguageRef(ref);
+  const defaults = resolveLanguageRef(defaultRef);
+  return {
+    name: resolved.name || defaults.name || '',
+    icon: resolved.icon || defaults.icon || 'circle',
+  };
+}
+
+interface Entry {
+  type?: 'file' | 'library';
   name: string;
   icon?: string;
-  language?: string;
-  languageIcon?: string;
-  versions?: VersionInfo[];
-  children?: ProjectChild[];
-}
-
-type ProjectChild = FileChild | LibrariesChild;
-
-interface FileChild {
-  type: 'file';
-  name: string;
+  language?: LanguageRef;
   library?: string;
-  icon?: string;
-  language?: string;
-  languageIcon?: string;
-  versions?: VersionInfo[];
+  versions?: Version[];
   snippet?: string;
 }
 
-interface LibrariesChild {
+interface Version {
+  tag: string;
+  language?: LanguageRef;
+  children?: VersionChild[];
+}
+
+type VersionChild = Entry | LibrariesGroup;
+
+interface LibrariesGroup {
   type: 'libraries';
   count?: number;
   entries: LibraryEntryData[];
@@ -62,76 +69,100 @@ interface LibraryEntryData {
 
 // ─── Dataset ─────────────────────────────────────────────────────────────────
 
-const PROJECTS: ProjectEntry[] = [
+const PROJECTS: Entry[] = [
   {
     name: 'Ray',
-    language: 'Ray',
-    languageIcon: 'circle',
+    language: { name: 'Ray', icon: 'circle' },
     versions: [
-      { tag: 'v1.0.0' },
-      { tag: 'v0.9.0', language: 'Set Theory' },
-    ],
-    children: [
       {
-        type: 'file',
-        name: 'UUID.ray',
-        icon: 'document',
-        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
-      },
-      {
-        type: 'libraries',
-        count: 10000,
-        entries: [
+        tag: 'v1.0.0',
+        children: [
           {
-            name: 'Library',
+            type: 'file',
+            name: 'UUID.ray',
+            icon: 'document',
             snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
           },
           {
-            name: 'Library',
-            reference: { name: 'Language' },
-            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+            type: 'libraries',
+            count: 10000,
+            entries: [
+              {
+                name: 'Library',
+                snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+              },
+              {
+                name: 'Library',
+                reference: { name: 'Language' },
+                snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+              },
+            ],
           },
         ],
       },
+      {
+        tag: 'v1.0.0',
+        language: 'Set Theory',
+      },
+      { tag: 'v0.9.0', language: 'Set Theory' },
+      { tag: 'v0.9.0' },
     ],
   },
   {
     name: 'Set Theory',
-    language: 'Set Theory',
-    languageIcon: 'circle',
+    language: { name: 'Set Theory', icon: 'circle' },
     versions: [
-      { tag: 'v2.0.0', language: 'Ray' },
-      { tag: 'v1.0.0' },
-    ],
-    children: [
       {
-        type: 'file',
-        name: 'set.mm',
-        versions: [
-          { tag: 'v1.0.0', language: 'Ray' },
+        tag: 'v2.0.0',
+        language: 'Ray',
+        children: [
+          {
+            type: 'library',
+            name: 'set.mm',
+            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+          },
         ],
-        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
       },
+      { tag: 'v2.0.0' },
+      {
+        tag: 'v1.0.0',
+        children: [
+          {
+            type: 'library',
+            name: 'set.mm',
+            versions: [
+              { tag: 'v1.0.0', language: 'Ray' },
+              { tag: 'v1.0.0' },
+            ],
+            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+          },
+        ],
+      },
+      { tag: 'v1.0.0', language: 'Ray' },
     ],
   },
   {
     name: 'UUID',
-    language: 'UUID',
-    languageIcon: 'circle',
+    language: { name: 'UUID', icon: 'circle' },
     versions: [
-      { tag: 'v1.0.0', language: 'Ray' },
-      { tag: 'v0.1.0' },
-    ],
-    children: [
       {
-        type: 'file',
-        name: 'UUID.ray',
-        library: 'Ray',
-        versions: [
-          { tag: 'v1.0.0', language: 'Ray' },
+        tag: 'v1.0.0',
+        language: 'Ray',
+        children: [
+          {
+            type: 'file',
+            name: 'UUID.ray',
+            library: 'Ray',
+            versions: [
+              { tag: 'v1.0.0', language: 'Ray' },
+              { tag: 'v1.0.0' },
+            ],
+            snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
+          },
         ],
-        snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
       },
+      { tag: 'v1.0.0' },
+      { tag: 'v0.1.0' },
     ],
   },
 ];
@@ -140,81 +171,19 @@ const PROJECTS: ProjectEntry[] = [
 
 const snippetStyle = {width: '100%', fontSize: '12px', padding: '10px', margin: '5px'};
 
-const FileName = ({ name, library }: { name: string; library?: string }) => {
-  if (library) {
-    return <span>{library} <span className="bp5-text-muted">{'//'}</span> <span className="bp5-text-disabled">{name}</span></span>;
-  }
-  return <span className="bp5-text-disabled">{name}</span>;
-}
-
-interface LanguageProps {
-  versions?: VersionInfo[];
-  defaultLanguage?: string;
-  defaultLanguageIcon?: string;
-}
-
-const Language = ({children, versions, defaultLanguage, defaultLanguageIcon}: Children & LanguageProps) => {
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const hasVersions = versions && versions.length > 0;
-  const selected = hasVersions ? versions[Math.min(selectedIdx, versions.length - 1)] : null;
-  const resolvedLanguage = selected ? (selected.language || defaultLanguage || '') : '';
-  const resolvedIcon = selected ? (selected.languageIcon || defaultLanguageIcon || 'circle') : 'circle';
-
-  return <>
-    <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
-      <Row middle="xs" className="child-pr-3">
-        {children}
-      </Row>
-    </Button>
-    {hasVersions && selected && <Col>
-      <Row>
-        <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
-        <Col>
-          <Row center="xs">
-            <Popover
-              content={
-                <Menu>
-                  {versions!.map((v, i) => {
-                    const vLang = v.language || defaultLanguage || '';
-                    const vIcon = v.languageIcon || defaultLanguageIcon || 'circle';
-                    return <MenuItem
-                      key={i}
-                      text={v.tag}
-                      label={vLang}
-                      icon={vIcon as any}
-                      active={i === selectedIdx}
-                      onClick={() => setSelectedIdx(i)}
-                    />;
-                  })}
-                </Menu>
-              }
-              placement="bottom-start"
-              minimal
-            >
-              <Button minimal className="pb-0">
-                <Row center="xs" middle="xs" className="bp5-text-muted">
-                  <Icon icon="git-branch" className="pr-3" size={12}/>
-                  <h5>{selected.tag}</h5>
-                  <Icon icon="caret-down" />
-                </Row>
-              </Button>
-            </Popover>
-          </Row>
-          <Row center="xs" middle="xs">
-            <Button minimal style={{fontSize: '10px', height: '100%'}}
-              icon={<Icon icon={resolvedIcon as any} size={10} />}
-              className="p-0">
-              {resolvedLanguage}
-            </Button>
-          </Row>
-        </Col>
-      </Row>
-    </Col>}
-  </>
-}
-
 const Snippet = ({ text }: { text: string }) =>
   <Block style={snippetStyle}>{text}</Block>
+
+const EntryName = ({ entry }: { entry: Entry }) => {
+  const isFile = entry.type === 'file';
+  if (entry.library) {
+    return <span>
+      {entry.library} <span className="bp5-text-muted">{'//'}</span>{' '}
+      {isFile ? <span className="bp5-text-disabled">{entry.name}</span> : entry.name}
+    </span>;
+  }
+  return isFile ? <span className="bp5-text-disabled">{entry.name}</span> : <span>{entry.name}</span>;
+}
 
 const LibraryEntryView = ({ entry }: { entry: LibraryEntryData }) => {
   const icon = entry.icon || 'circle';
@@ -230,7 +199,7 @@ const LibraryEntryView = ({ entry }: { entry: LibraryEntryData }) => {
   </>;
 }
 
-const LibrariesView = ({ data }: { data: LibrariesChild }) => <>
+const LibrariesView = ({ data }: { data: LibrariesGroup }) => <>
   <Row middle="xs" className="child-pr-3">
     <Icon icon="git-repo" size={14} />
     <span>Libraries{data.count !== undefined && <span className="bp5-text-muted"> ({data.count.toLocaleString()})</span>}</span>
@@ -242,61 +211,195 @@ const LibrariesView = ({ data }: { data: LibrariesChild }) => <>
   </Row>
 </>
 
-const FileChildView = ({ file, defaultLanguage, defaultLanguageIcon }: { file: FileChild; defaultLanguage?: string; defaultLanguageIcon?: string }) => {
-  const icon = file.icon || 'circle';
-  const hasVersions = file.versions && file.versions.length > 0;
-  const fileLang = file.language || defaultLanguage;
-  const fileIcon = file.languageIcon || defaultLanguageIcon;
-  return <>
-    {hasVersions ? (
-      <Row><Language versions={file.versions} defaultLanguage={fileLang} defaultLanguageIcon={fileIcon}>
-        <Icon icon={icon as any} size={14} />
-        <FileName name={file.name} library={file.library} />
-      </Language></Row>
-    ) : (
-      <Row middle="xs" className="child-pr-3">
-        <Icon icon={icon as any} size={14} className="bp5-text-disabled" />
-        <FileName name={file.name} library={file.library} />
-      </Row>
-    )}
-    {file.snippet && <Snippet text={file.snippet} />}
-  </>;
-}
+const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defaultLanguage?: LanguageRef; isTopLevel?: boolean }) => {
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [selectedLangName, setSelectedLangName] = useState<string | null>(null);
 
-const ProjectEntryView = ({ project }: { project: ProjectEntry }) => {
-  const icon = project.icon || 'circle';
-  const hasVersions = project.versions && project.versions.length > 0;
+  const hasVersions = entry.versions && entry.versions.length > 0;
+  const entryLang = entry.language || defaultLanguage;
+  const isFile = entry.type === 'file';
+  const isLibrary = entry.type === 'library';
+  const defaultIcon = isLibrary ? 'git-repo' : 'circle';
+  const icon = entry.icon || defaultIcon;
+
+  // Group this entry's versions by tag, dedup languages within each tag
+  const tagGroups = useMemo(() => {
+    if (!hasVersions) return [];
+    const groups: { tag: string; langs: { name: string; icon: string }[] }[] = [];
+    const tagMap = new Map<string, { name: string; icon: string }[]>();
+    for (const v of entry.versions!) {
+      const lang = resolveLanguage(v.language, entryLang);
+      if (!tagMap.has(v.tag)) {
+        const arr: { name: string; icon: string }[] = [];
+        tagMap.set(v.tag, arr);
+        groups.push({ tag: v.tag, langs: arr });
+      }
+      const arr = tagMap.get(v.tag)!;
+      if (!arr.some(l => l.name === lang.name)) {
+        arr.push(lang);
+      }
+    }
+    return groups;
+  }, [entry.versions, entryLang, hasVersions]);
+
+  // Resolve current selection with fallbacks
+  const currentTag = selectedTag && tagGroups.some(g => g.tag === selectedTag)
+    ? selectedTag : (tagGroups[0]?.tag || '');
+  const currentGroup = tagGroups.find(g => g.tag === currentTag);
+  const defaultLangOption = currentGroup?.langs[0];
+  const currentLangName = (selectedLangName && currentGroup?.langs.some(l => l.name === selectedLangName))
+    ? selectedLangName : defaultLangOption?.name || '';
+  const currentLang = currentGroup?.langs.find(l => l.name === currentLangName) || defaultLangOption || { name: '', icon: 'circle' };
+
+  // Find the selected version object (matching tag + language)
+  const selectedVersion = useMemo(() => {
+    if (!hasVersions) return null;
+    return entry.versions!.find(v => {
+      const lang = resolveLanguage(v.language, entryLang);
+      return v.tag === currentTag && lang.name === currentLangName;
+    }) || entry.versions![0];
+  }, [entry.versions, currentTag, currentLangName, entryLang, hasVersions]);
+
+  // Languages available for the current tag on this entry
+  const langsForCurrentTag = currentGroup?.langs || [];
+
+  const nameElement = isTopLevel
+    ? <h3>{entry.name}</h3>
+    : <EntryName entry={entry} />;
+
   return <>
     <Row middle="xs" between="xs">
       {hasVersions ? (
-        <Language versions={project.versions} defaultLanguage={project.language} defaultLanguageIcon={project.languageIcon}>
-          <Icon icon={icon as any} size={16} />
-          <h3>{project.name}</h3>
-        </Language>
+        <>
+          <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
+            <Row middle="xs" className="child-pr-3">
+              <Icon icon={icon as any} size={isTopLevel ? 16 : 14} />
+              {nameElement}
+            </Row>
+          </Button>
+          <Col>
+            <Row>
+              <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
+              <Col>
+                <Row center="xs">
+                  <Popover
+                    content={
+                      <Menu>
+                        {tagGroups.map(({ tag, langs }) => (
+                          <MenuItem
+                            key={tag}
+                            text={tag}
+                            icon="git-branch"
+                            active={tag === currentTag}
+                            labelElement={
+                              <span style={{display: 'flex', gap: '4px'}}>
+                                {langs.map(lang => (
+                                  <Tag
+                                    key={lang.name}
+                                    minimal
+                                    round
+                                    interactive
+                                    icon={<Icon icon={lang.icon as any} size={10} />}
+                                    intent={tag === currentTag && lang.name === currentLangName ? 'primary' : 'none'}
+                                    onClick={(e: React.MouseEvent) => {
+                                      e.stopPropagation();
+                                      setSelectedTag(tag);
+                                      setSelectedLangName(lang.name);
+                                    }}
+                                  >
+                                    {lang.name}
+                                  </Tag>
+                                ))}
+                              </span>
+                            }
+                            onClick={() => setSelectedTag(tag)}
+                          />
+                        ))}
+                      </Menu>
+                    }
+                    placement="bottom-start"
+                    minimal
+                  >
+                    <Button minimal className="pb-0">
+                      <Row center="xs" middle="xs" className="bp5-text-muted">
+                        <Icon icon="git-branch" className="pr-3" size={12}/>
+                        <h5>{currentTag}</h5>
+                        <Icon icon="caret-down" />
+                      </Row>
+                    </Button>
+                  </Popover>
+                </Row>
+                <Row center="xs" middle="xs">
+                  <Popover
+                    content={
+                      <Menu>
+                        <MenuItem
+                          text={currentTag}
+                          icon="git-branch"
+                          active
+                          labelElement={
+                            <span style={{display: 'flex', gap: '4px'}}>
+                              {langsForCurrentTag.map(lang => (
+                                <Tag
+                                  key={lang.name}
+                                  minimal
+                                  round
+                                  interactive
+                                  icon={<Icon icon={lang.icon as any} size={10} />}
+                                  intent={lang.name === currentLangName ? 'primary' : 'none'}
+                                  onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    setSelectedLangName(lang.name);
+                                  }}
+                                >
+                                  {lang.name}
+                                </Tag>
+                              ))}
+                            </span>
+                          }
+                        />
+                      </Menu>
+                    }
+                    placement="bottom-start"
+                    minimal
+                  >
+                    <Button minimal style={{fontSize: '10px', height: '100%'}}
+                      icon={<Icon icon={currentLang.icon as any} size={10} />}
+                      className="p-0">
+                      {currentLang.name}
+                      <Icon icon="caret-down" size={10} />
+                    </Button>
+                  </Popover>
+                </Row>
+              </Col>
+            </Row>
+          </Col>
+        </>
       ) : (
         <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
           <Row middle="xs" className="child-pr-3">
-            <Icon icon={icon as any} size={16} />
-            <h3>{project.name}</h3>
+            <Icon icon={icon as any} size={isTopLevel ? 16 : 14} className={isFile ? "bp5-text-disabled" : undefined} />
+            {nameElement}
           </Row>
         </Button>
       )}
     </Row>
-    {project.children && project.children.length > 0 && <Row>
+    {entry.snippet && <Snippet text={entry.snippet} />}
+    {selectedVersion?.children && selectedVersion.children.length > 0 && <Row>
       <Col xs={12} className="pl-8">
-        {project.children.map((child, i) =>
-          child.type === 'file'
-            ? <FileChildView key={i} file={child} defaultLanguage={project.language} defaultLanguageIcon={project.languageIcon} />
-            : <LibrariesView key={i} data={child} />
+        {selectedVersion.children.map((child, i) =>
+          child.type === 'libraries'
+            ? <LibrariesView key={i} data={child as LibrariesGroup} />
+            : <EntryView key={i} entry={child as Entry} defaultLanguage={entryLang} />
         )}
       </Col>
     </Row>}
   </>;
 }
 
-const ProjectList = ({ projects }: { projects: ProjectEntry[] }) => <>
+const ProjectList = ({ projects }: { projects: Entry[] }) => <>
   {projects.map((project, i) =>
-    <ProjectEntryView key={i} project={project} />
+    <EntryView key={i} entry={project} isTopLevel />
   )}
 </>
 
