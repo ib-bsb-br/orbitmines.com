@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -40,12 +41,30 @@ export type DropZoneType = 'tab' | 'left' | 'right' | 'top' | 'bottom';
 export interface DropZone {
   targetId: string;
   type: DropZoneType;
+  insertIndex?: number;
 }
 
 interface DragState {
   panelId: string;
   sourceGroupId: string;
 }
+
+interface CollapseRecord {
+  panels: string[];
+  removedGroupId: string;
+  originalSize: number;
+  originalIndex: number;
+  parentSplitId: string;
+  targetGroupId: string;
+  insertPosition: 'before' | 'after';
+  originalActiveIndex: number;
+  collapsedAtDim: number;
+  direction: 'horizontal' | 'vertical';
+}
+
+const MIN_COLLAPSE_HORIZONTAL_PX = 250;
+const MIN_COLLAPSE_VERTICAL_PX = 120;
+const RESTORE_HYSTERESIS_PX = 20;
 
 // ─── ID Generation ───────────────────────────────────────────────────────────
 
@@ -167,6 +186,239 @@ export function normalizeTree(node: LayoutNode): LayoutNode | null {
   };
 }
 
+// ─── Responsive Collapse Helpers ─────────────────────────────────────────────
+
+function findEdgeTabGroup(
+  node: LayoutNode,
+  side: 'left' | 'right'
+): TabGroupNode | null {
+  if (node.type === 'tabgroup') return node;
+  if (node.type === 'split') {
+    if (node.children.length === 0) return null;
+    const idx = side === 'left' ? 0 : node.children.length - 1;
+    return findEdgeTabGroup(node.children[idx], side);
+  }
+  return null;
+}
+
+function findSmallestBelowThreshold(
+  node: LayoutNode,
+  availWidth: number,
+  availHeight: number
+): { childNode: LayoutNode; parentSplit: SplitNode; childIndex: number } | null {
+  if (node.type !== 'split') return null;
+
+  const isHoriz = node.direction === 'horizontal';
+  const dim = isHoriz ? availWidth : availHeight;
+  const threshold = isHoriz ? MIN_COLLAPSE_HORIZONTAL_PX : MIN_COLLAPSE_VERTICAL_PX;
+  const handleSpace = (node.children.length - 1) * 4;
+  const contentSpace = dim - handleSpace;
+
+  // Recurse into children first (collapse deepest levels first)
+  for (let i = 0; i < node.children.length; i++) {
+    const childDim = contentSpace * node.sizes[i];
+    const childW = isHoriz ? childDim : availWidth;
+    const childH = isHoriz ? availHeight : childDim;
+    const deeper = findSmallestBelowThreshold(
+      node.children[i],
+      childW,
+      childH
+    );
+    if (deeper) return deeper;
+  }
+
+  // Check this level — only collapse tab group children
+  if (node.children.length <= 1) return null;
+
+  let smallestIndex = -1;
+  let smallestPx = Infinity;
+
+  for (let i = 0; i < node.children.length; i++) {
+    const childPx = contentSpace * node.sizes[i];
+    if (
+      node.children[i].type === 'tabgroup' &&
+      childPx < threshold &&
+      childPx < smallestPx
+    ) {
+      smallestPx = childPx;
+      smallestIndex = i;
+    }
+  }
+
+  if (smallestIndex !== -1) {
+    return {
+      childNode: node.children[smallestIndex],
+      parentSplit: node,
+      childIndex: smallestIndex,
+    };
+  }
+
+  return null;
+}
+
+function performSingleCollapse(
+  tree: LayoutNode,
+  target: { childNode: LayoutNode; parentSplit: SplitNode; childIndex: number },
+  containerWidth: number,
+  containerHeight: number
+): { tree: LayoutNode; record: CollapseRecord } | null {
+  const { childNode, parentSplit, childIndex } = target;
+  if (childNode.type !== 'tabgroup') return null;
+  if (parentSplit.children.length <= 1) return null;
+
+  // Find the largest sibling
+  let largestIndex = -1;
+  let largestSize = -1;
+  for (let i = 0; i < parentSplit.children.length; i++) {
+    if (i === childIndex) continue;
+    if (parentSplit.sizes[i] > largestSize) {
+      largestSize = parentSplit.sizes[i];
+      largestIndex = i;
+    }
+  }
+  if (largestIndex === -1) return null;
+
+  const isFromLeft = childIndex < largestIndex;
+  const targetTabGroup = findEdgeTabGroup(
+    parentSplit.children[largestIndex],
+    isFromLeft ? 'left' : 'right'
+  );
+  if (!targetTabGroup) return null;
+
+  const currentTarget = findNode(tree, targetTabGroup.id) as TabGroupNode;
+  if (!currentTarget || currentTarget.type !== 'tabgroup') return null;
+
+  // Merge panels: prepend if from left, append if from right
+  const newPanels = isFromLeft
+    ? [...childNode.panels, ...currentTarget.panels]
+    : [...currentTarget.panels, ...childNode.panels];
+
+  // Keep the target's active tab selected
+  const newActiveIndex = isFromLeft
+    ? childNode.panels.length + currentTarget.activeIndex
+    : currentTarget.activeIndex;
+
+  let newTree = replaceNode(tree, targetTabGroup.id, {
+    ...currentTarget,
+    panels: newPanels,
+    activeIndex: newActiveIndex,
+  });
+
+  // Remove the collapsed child from the parent split
+  const currentParent = findNode(newTree, parentSplit.id) as SplitNode;
+  if (!currentParent || currentParent.type !== 'split') return null;
+
+  const newChildren = currentParent.children.filter((_, i) => i !== childIndex);
+  const newSizes = currentParent.sizes.filter((_, i) => i !== childIndex);
+  const sizeSum = newSizes.reduce((a, b) => a + b, 0);
+  const normalizedSizes = newSizes.map((s) => s / sizeSum);
+
+  newTree = replaceNode(newTree, parentSplit.id, {
+    ...currentParent,
+    children: newChildren,
+    sizes: normalizedSizes,
+  });
+
+  const dim =
+    parentSplit.direction === 'horizontal' ? containerWidth : containerHeight;
+
+  const record: CollapseRecord = {
+    panels: childNode.panels,
+    removedGroupId: childNode.id,
+    originalSize: parentSplit.sizes[childIndex],
+    originalIndex: childIndex,
+    parentSplitId: parentSplit.id,
+    targetGroupId: targetTabGroup.id,
+    insertPosition: isFromLeft ? 'before' : 'after',
+    originalActiveIndex: childNode.activeIndex,
+    collapsedAtDim: dim,
+    direction: parentSplit.direction,
+  };
+
+  return { tree: newTree, record };
+}
+
+function tryRestoreRecord(
+  tree: LayoutNode,
+  record: CollapseRecord
+): LayoutNode | null {
+  const parentSplit = findNode(tree, record.parentSplitId);
+  if (!parentSplit || parentSplit.type !== 'split') return null;
+
+  const targetGroup = findNode(tree, record.targetGroupId);
+  if (!targetGroup || targetGroup.type !== 'tabgroup') return null;
+
+  // Position-based: take panels from the front or back based on how they
+  // were inserted — this respects any reordering the user did while collapsed
+  const panelCount = Math.min(record.panels.length, targetGroup.panels.length - 1);
+  if (panelCount <= 0) return null;
+
+  let panelsToRestore: string[];
+  let remainingPanels: string[];
+
+  if (record.insertPosition === 'before') {
+    panelsToRestore = targetGroup.panels.slice(0, panelCount);
+    remainingPanels = targetGroup.panels.slice(panelCount);
+  } else {
+    panelsToRestore = targetGroup.panels.slice(-panelCount);
+    remainingPanels = targetGroup.panels.slice(0, -panelCount);
+  }
+
+  if (remainingPanels.length === 0) return null;
+
+  // Keep the target's active panel selected
+  const activePanel = targetGroup.panels[targetGroup.activeIndex];
+  let newTargetActive: number;
+  if (panelsToRestore.includes(activePanel)) {
+    newTargetActive = 0;
+  } else {
+    newTargetActive = remainingPanels.indexOf(activePanel);
+    if (newTargetActive < 0) newTargetActive = 0;
+  }
+
+  let newTree = replaceNode(tree, targetGroup.id, {
+    ...targetGroup,
+    panels: remainingPanels,
+    activeIndex: newTargetActive,
+  });
+
+  // Recreate the tab group
+  const restoredGroup: TabGroupNode = {
+    type: 'tabgroup',
+    id: record.removedGroupId,
+    panels: panelsToRestore,
+    activeIndex: Math.min(
+      record.originalActiveIndex,
+      panelsToRestore.length - 1
+    ),
+  };
+
+  // Re-insert into parent split
+  const currentParent = findNode(newTree, record.parentSplitId) as SplitNode;
+  if (!currentParent || currentParent.type !== 'split') return null;
+
+  const newChildren = [...currentParent.children];
+  const newSizes = [...currentParent.sizes];
+
+  // Scale existing sizes to make room
+  const scaleFactor = 1 - record.originalSize;
+  for (let i = 0; i < newSizes.length; i++) {
+    newSizes[i] *= scaleFactor;
+  }
+
+  const insertIdx = Math.min(record.originalIndex, newChildren.length);
+  newChildren.splice(insertIdx, 0, restoredGroup);
+  newSizes.splice(insertIdx, 0, record.originalSize);
+
+  newTree = replaceNode(newTree, record.parentSplitId, {
+    ...currentParent,
+    children: newChildren,
+    sizes: newSizes,
+  });
+
+  return newTree;
+}
+
 // ─── Context ─────────────────────────────────────────────────────────────────
 
 interface IDELayoutContextValue {
@@ -180,7 +432,8 @@ interface IDELayoutContextValue {
   movePanelToTabGroup: (
     panelId: string,
     sourceGroupId: string,
-    targetGroupId: string
+    targetGroupId: string,
+    insertIndex?: number
   ) => void;
   splitAndPlace: (
     panelId: string,
@@ -371,26 +624,44 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
   const activePanel = panelRegistry.get(node.panels[node.activeIndex]);
   const isDropTarget = dropZone && dropZone.targetId === node.id;
 
+  const computeTabInsertIndex = useCallback(
+    (e: React.DragEvent): number => {
+      if (!tabBarRef.current) return 0;
+      // Query non-dragging tabs so index is relative to the final list
+      const tabs = tabBarRef.current.querySelectorAll(
+        '.ide-tab:not(.ide-tab--dragging)'
+      );
+      for (let i = 0; i < tabs.length; i++) {
+        const rect = tabs[i].getBoundingClientRect();
+        const midX = rect.left + rect.width / 2;
+        if (e.clientX < midX) return i;
+      }
+      return tabs.length;
+    },
+    []
+  );
+
   const detectDropZone = useCallback(
-    (e: React.DragEvent): DropZoneType | null => {
+    (e: React.DragEvent): { type: DropZoneType; insertIndex?: number } | null => {
       if (!containerRef.current || !tabBarRef.current) return null;
 
       const tabBarRect = tabBarRef.current.getBoundingClientRect();
-      // If over the tab bar, it's a tab merge
-      if (e.clientY < tabBarRect.bottom) return 'tab';
+      if (e.clientY < tabBarRect.bottom) {
+        return { type: 'tab', insertIndex: computeTabInsertIndex(e) };
+      }
 
       const rect = containerRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
       const y = (e.clientY - rect.top) / rect.height;
       const threshold = 0.25;
 
-      if (x < threshold) return 'left';
-      if (x > 1 - threshold) return 'right';
-      if (y < threshold) return 'top';
-      if (y > 1 - threshold) return 'bottom';
-      return 'tab';
+      if (x < threshold) return { type: 'left' };
+      if (x > 1 - threshold) return { type: 'right' };
+      if (y < threshold) return { type: 'top' };
+      if (y > 1 - threshold) return { type: 'bottom' };
+      return { type: 'tab', insertIndex: computeTabInsertIndex(e) };
     },
-    []
+    [computeTabInsertIndex]
   );
 
   const onDragOver = useCallback(
@@ -408,7 +679,11 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
 
       const zone = detectDropZone(e);
       if (zone) {
-        setDropZone({ targetId: node.id, type: zone });
+        setDropZone({
+          targetId: node.id,
+          type: zone.type,
+          insertIndex: zone.insertIndex,
+        });
       }
     },
     [dragState, node.id, node.panels.length, detectDropZone, setDropZone]
@@ -416,7 +691,6 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
 
   const onDragLeave = useCallback(
     (e: React.DragEvent) => {
-      // Only clear if we're actually leaving the container
       if (
         containerRef.current &&
         !containerRef.current.contains(e.relatedTarget as Node)
@@ -438,7 +712,12 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
       const { panelId, sourceGroupId } = dragState;
 
       if (dropZone.type === 'tab') {
-        movePanelToTabGroup(panelId, sourceGroupId, node.id);
+        movePanelToTabGroup(
+          panelId,
+          sourceGroupId,
+          node.id,
+          dropZone.insertIndex
+        );
       } else {
         splitAndPlace(
           panelId,
@@ -462,6 +741,78 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
     ]
   );
 
+  // Build tab elements with insertion indicator
+  const showInsert =
+    isDropTarget &&
+    dropZone!.type === 'tab' &&
+    dropZone!.insertIndex !== undefined;
+  const insertAt = dropZone?.insertIndex ?? -1;
+
+  const tabElements: React.ReactNode[] = [];
+  let nonDragIdx = 0;
+
+  for (let i = 0; i < node.panels.length; i++) {
+    const panelId = node.panels[i];
+    const isDragging = dragState?.panelId === panelId;
+
+    if (!isDragging) {
+      if (showInsert && insertAt === nonDragIdx) {
+        tabElements.push(
+          <div key="insert-indicator" className="ide-tab-insert-indicator" />
+        );
+      }
+      nonDragIdx++;
+    }
+
+    const panel = panelRegistry.get(panelId);
+    if (!panel) continue;
+
+    tabElements.push(
+      <div
+        key={panelId}
+        className={`ide-tab${i === node.activeIndex ? ' ide-tab--active' : ''}${isDragging ? ' ide-tab--dragging' : ''}`}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData('text/plain', panelId);
+          e.dataTransfer.effectAllowed = 'move';
+          setTimeout(() => {
+            setDragState({ panelId, sourceGroupId: node.id });
+          }, 0);
+        }}
+        onDragEnd={() => {
+          setDragState(null);
+          setDropZone(null);
+        }}
+        onClick={() => setActiveTab(node.id, i)}
+      >
+        {panel.icon && (
+          <span className="ide-tab__icon">
+            <Icon icon={panel.icon as any} size={12} />
+          </span>
+        )}
+        <span className="ide-tab__title">{panel.title}</span>
+        {panel.closable !== false && (
+          <span
+            className="ide-tab__close"
+            onClick={(e) => {
+              e.stopPropagation();
+              closePanel(node.id, panelId);
+            }}
+          >
+            <Icon icon="small-cross" size={12} />
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  // Indicator at end
+  if (showInsert && insertAt === nonDragIdx) {
+    tabElements.push(
+      <div key="insert-indicator" className="ide-tab-insert-indicator" />
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -471,56 +822,16 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
       onDrop={onDrop}
     >
       <div ref={tabBarRef} className="ide-tabbar">
-        {node.panels.map((panelId, i) => {
-          const panel = panelRegistry.get(panelId);
-          if (!panel) return null;
-
-          return (
-            <div
-              key={panelId}
-              className={`ide-tab${i === node.activeIndex ? ' ide-tab--active' : ''}${dragState?.panelId === panelId ? ' ide-tab--dragging' : ''}`}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('text/plain', panelId);
-                e.dataTransfer.effectAllowed = 'move';
-                // Use setTimeout to avoid the drag image flash
-                setTimeout(() => {
-                  setDragState({ panelId, sourceGroupId: node.id });
-                }, 0);
-              }}
-              onDragEnd={() => {
-                setDragState(null);
-                setDropZone(null);
-              }}
-              onClick={() => setActiveTab(node.id, i)}
-            >
-              {panel.icon && (
-                <span className="ide-tab__icon">
-                  <Icon icon={panel.icon as any} size={12} />
-                </span>
-              )}
-              <span className="ide-tab__title">{panel.title}</span>
-              {panel.closable !== false && (
-                <span
-                  className="ide-tab__close"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closePanel(node.id, panelId);
-                  }}
-                >
-                  <Icon icon="small-cross" size={12} />
-                </span>
-              )}
-            </div>
-          );
-        })}
+        {tabElements}
       </div>
 
       <div className="ide-panel-content">
         {activePanel ? activePanel.render() : null}
       </div>
 
-      {isDropTarget && <DropIndicator type={dropZone!.type} />}
+      {isDropTarget && dropZone!.type !== 'tab' && (
+        <DropIndicator type={dropZone!.type} />
+      )}
     </div>
   );
 };
@@ -597,6 +908,8 @@ const IDELayout: React.FC<IDELayoutProps> = ({
   const [layout, setLayout] = useState<LayoutNode>(initialLayout);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
+  const collapseStackRef = useRef<CollapseRecord[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const panelRegistry = useMemo(() => {
     const map = new Map<string, PanelDefinition>();
@@ -628,18 +941,58 @@ const IDELayout: React.FC<IDELayoutProps> = ({
   );
 
   const movePanelToTabGroup = useCallback(
-    (panelId: string, sourceGroupId: string, targetGroupId: string) => {
+    (
+      panelId: string,
+      sourceGroupId: string,
+      targetGroupId: string,
+      insertIndex?: number
+    ) => {
+      if (sourceGroupId === targetGroupId) {
+        // Same-group reorder — preserve collapse stack
+        setLayout((prev) => {
+          const group = findNode(prev, sourceGroupId);
+          if (!group || group.type !== 'tabgroup') return prev;
+
+          const currentIdx = group.panels.indexOf(panelId);
+          if (currentIdx === -1) return prev;
+
+          const newPanels = group.panels.filter((p) => p !== panelId);
+          const idx =
+            insertIndex !== undefined
+              ? Math.min(insertIndex, newPanels.length)
+              : newPanels.length;
+          newPanels.splice(idx, 0, panelId);
+
+          return replaceNode(prev, sourceGroupId, {
+            ...group,
+            panels: newPanels,
+            activeIndex: idx,
+          });
+        });
+        return;
+      }
+
+      // Cross-group move — clear collapse stack
+      collapseStackRef.current = [];
       setLayout((prev) => {
         // Remove from source
         let tree = removePanelFromNode(prev, sourceGroupId, panelId);
 
-        // Add to target
+        // Add to target at specific position
         const target = findNode(tree, targetGroupId);
         if (!target || target.type !== 'tabgroup') return prev;
+
+        const newPanels = [...target.panels];
+        const idx =
+          insertIndex !== undefined
+            ? Math.min(insertIndex, newPanels.length)
+            : newPanels.length;
+        newPanels.splice(idx, 0, panelId);
+
         tree = replaceNode(tree, targetGroupId, {
           ...target,
-          panels: [...target.panels, panelId],
-          activeIndex: target.panels.length, // activate new tab
+          panels: newPanels,
+          activeIndex: idx,
         });
 
         // Normalize
@@ -656,6 +1009,7 @@ const IDELayout: React.FC<IDELayoutProps> = ({
       targetGroupId: string,
       edge: 'left' | 'right' | 'top' | 'bottom'
     ) => {
+      collapseStackRef.current = [];
       setLayout((prev) => {
         // Remove from source
         let tree = removePanelFromNode(prev, sourceGroupId, panelId);
@@ -719,6 +1073,7 @@ const IDELayout: React.FC<IDELayoutProps> = ({
 
   const closePanel = useCallback(
     (groupId: string, panelId: string) => {
+      collapseStackRef.current = [];
       setLayout((prev) => {
         const tree = removePanelFromNode(prev, groupId, panelId);
         return normalizeTree(tree) || prev;
@@ -726,6 +1081,106 @@ const IDELayout: React.FC<IDELayoutProps> = ({
     },
     []
   );
+
+  // ─── Responsive Collapse / Restore ──────────────────────────────────────────
+
+  const handleResize = useCallback((width: number, height: number) => {
+    setLayout((prev) => {
+      let tree = prev;
+      const stack = collapseStackRef.current;
+
+      // Phase 1: Restore — if screen grew past the collapse point
+      let didChange = true;
+      while (didChange && stack.length > 0) {
+        didChange = false;
+        const record = stack[stack.length - 1];
+        const dim =
+          record.direction === 'horizontal' ? width : height;
+
+        if (dim > record.collapsedAtDim + RESTORE_HYSTERESIS_PX) {
+          const result = tryRestoreRecord(tree, record);
+          if (result) {
+            tree = result;
+            stack.pop();
+            didChange = true;
+          } else {
+            // Record is stale (user reorganized), discard it
+            stack.pop();
+            didChange = true;
+          }
+        }
+      }
+
+      // Phase 2: Collapse — find anything too small
+      let collapsed = true;
+      while (collapsed) {
+        collapsed = false;
+        const target = findSmallestBelowThreshold(
+          tree,
+          width,
+          height
+        );
+        if (target && target.parentSplit.children.length > 1) {
+          const result = performSingleCollapse(
+            tree,
+            target,
+            width,
+            height
+          );
+          if (result) {
+            tree = result.tree;
+            if (
+              !stack.some(
+                (r) => r.removedGroupId === result.record.removedGroupId
+              )
+            ) {
+              stack.push(result.record);
+            }
+            collapsed = true;
+          }
+        }
+      }
+
+      return tree;
+    });
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    let rafId: number;
+    let prevWidth = 0;
+    let prevHeight = 0;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+
+      if (
+        Math.abs(width - prevWidth) < 1 &&
+        Math.abs(height - prevHeight) < 1
+      )
+        return;
+      prevWidth = width;
+      prevHeight = height;
+
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        handleResize(width, height);
+      });
+    });
+
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+    };
+  }, [handleResize]);
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   const contextValue = useMemo<IDELayoutContextValue>(
     () => ({
@@ -756,7 +1211,7 @@ const IDELayout: React.FC<IDELayoutProps> = ({
 
   return (
     <IDELayoutContext.Provider value={contextValue}>
-      <div className="ide-layout">
+      <div ref={containerRef} className="ide-layout">
         <LayoutNodeRenderer node={layout} />
       </div>
     </IDELayoutContext.Provider>

@@ -188,8 +188,8 @@ const Library = () => {
       <title lang="en">Ether Library: The Language Index</title>
     </Helmet>
 
-    <Row className="py-10 px-15" style={{width: '100%'}}>
-      <Row between="xs" style={{width: '100%'}}>
+    <Row style={{width: '100%'}}>
+      <Row between="xs" style={{width: '100%'}} className="pt-10 px-15">
         <Button icon="arrow-left" minimal onClick={() => navigate('/')} />
 
         <Col>
@@ -198,7 +198,7 @@ const Library = () => {
         </Col>
       </Row>
 
-      <div style={{width: '100%', height: 'calc(100vh - 120px)', maxWidth: '1650px', margin: '0 auto'}} className="pt-20">
+      <div style={{width: '100%', height: 'calc(100vh - 80px)', maxWidth: '1650px', margin: '0 auto'}} className="pt-20">
         <IDELayout panels={panels} initialLayout={initialLayout} />
       </div>
     </Row>

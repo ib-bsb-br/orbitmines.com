@@ -167,6 +167,13 @@
   padding: 8px;
 }
 
+// Tab insertion indicator
+.ide-tab-insert-indicator {
+  flex: 0 0 2px;
+  align-self: stretch;
+  background: $blue3;
+}
+
 // Drop indicator overlay
 .ide-drop-indicator {
   position: absolute;
