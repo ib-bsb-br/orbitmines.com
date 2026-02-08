@@ -135,8 +135,9 @@ export const Navigation = (props: PaperProps) => {
   const [params, setParams] = useSearchParams();
 
   const util = new BookUtil(props, params)
+  const generate = params.get('generate');
 
-  return <Row style={{height: '100%', borderRight: '1px solid rgb(108, 103, 131)', alignContent: 'flex-start'}} className="pl-10 child-py-3 py-20">
+  return <Row style={{height: '100%', ...(generate !== 'button' && generate !== 'pdf' ? {borderRight: '1px solid rgb(108, 103, 131)'} : {}), alignContent: 'flex-start'}} className="pl-10 child-py-3 py-20">
     {util.arcs().map((arc: any) => <Col xs={12} style={{textAlign: 'start'}}>
       <a className="bp5-text-muted" style={{color: util.isSelected(arc) ? 'orange' : '#abb3bf'}} onClick={() => !util.disabled(arc) ? setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.sectionName(arc)); next.delete('search'); return next; }) : undefined}>{arc.props.head}</a>
 
@@ -365,7 +366,7 @@ const Book = (props: PaperProps) => {
 
   const generate = params.get('generate');
 
-  if (generate === 'button')
+  if (generate === 'button' || generate === 'pdf')
     return <Row>
       <Col xs={12}>
         <Navigation {...props} />
