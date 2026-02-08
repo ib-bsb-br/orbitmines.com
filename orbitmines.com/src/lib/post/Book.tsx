@@ -81,17 +81,17 @@ export const Navigation = (props: PaperProps) => {
 
   return <Row style={{height: '100%', borderRight: '1px solid rgb(108, 103, 131)', alignContent: 'flex-start'}} className="pl-10 child-py-3 py-20">
     {util.arcs().map((arc: any) => <Col xs={12} style={{textAlign: 'start'}}>
-      <a className="bp5-text-muted" style={{color: util.isSelected(arc) ? 'orange' : '#abb3bf'}} onClick={() => !util.disabled(arc) ? setParams({...params, section: util.sectionName(arc)}) : undefined}>{arc.props.head}</a>
+      <a className="bp5-text-muted" style={{color: util.isSelected(arc) ? 'orange' : '#abb3bf'}} onClick={() => !util.disabled(arc) ? setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.sectionName(arc)); return next; }) : undefined}>{arc.props.head}</a>
 
       {React.Children.toArray((arc as any).props.children).filter(child =>
         React.isValidElement(child) && child.type === Section
       ).map((section: any) => <Col xs={12} style={{textAlign: 'start'}} className="pt-3">
-        <a className="bp5-text-muted ml-5" style={util.isSelected(section) ? {color: 'orange'} : {}} onClick={() => !util.disabled(section) ? setParams({...params, section: util.sectionName(section)}) : undefined}>{section.props.head}</a>
+        <a className="bp5-text-muted ml-5" style={util.isSelected(section) ? {color: 'orange'} : {}} onClick={() => !util.disabled(section) ? setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.sectionName(section)); return next; }) : undefined}>{section.props.head}</a>
 
         {React.Children.toArray((section as any).props.children).filter(child =>
           React.isValidElement(child) && child.type === Section
         ).map((section: any) => <Col xs={12} style={{textAlign: 'start'}}>
-          <a className="bp5-text-muted ml-10" style={util.isSelected(section) ? {color: 'orange'} : {}} onClick={() => !util.disabled(section) ? setParams({...params, section: util.sectionName(section)}) : undefined}>{section.props.head}</a>
+          <a className="bp5-text-muted ml-10" style={util.isSelected(section) ? {color: 'orange'} : {}} onClick={() => !util.disabled(section) ? setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.sectionName(section)); return next; }) : undefined}>{section.props.head}</a>
 
 
         </Col>)}
@@ -130,7 +130,7 @@ const Book = (props: PaperProps) => {
 
   if (isStartPage)
     return <Row end="xs">
-      <Button rightIcon="arrow-right" text="Start Reading" minimal style={{fontSize: '18px'}} onClick={() => setParams({...params, section: util.firstSection() })} />
+      <Button rightIcon="arrow-right" text="Start Reading" minimal style={{fontSize: '18px'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.firstSection()); return next; })} />
     </Row>
 
   return <Row>
@@ -144,8 +144,8 @@ const Book = (props: PaperProps) => {
     </Col>
     <Col xs={12}>
       <Row between="xs">
-        {util.previous() ? <Button icon="arrow-left" text={util.previousSection()} minimal style={{fontSize: '18px', maxWidth: '50%'}} onClick={() => setParams({...params, section: util.previousSection()})} /> : <div/>}
-        {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px', maxWidth: '50%'}} onClick={() => setParams({...params, section: util.nextSection()})} /> : null}
+        {util.previous() ? <Button icon="arrow-left" text={util.previousSection()} minimal style={{fontSize: '18px', maxWidth: '50%'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.previousSection()); return next; })} /> : <div/>}
+        {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px', maxWidth: '50%'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.nextSection()); return next; })} /> : null}
       </Row>
     </Col>
   </Row>

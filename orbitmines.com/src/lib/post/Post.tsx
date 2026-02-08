@@ -880,7 +880,7 @@ export const Exports = (
             id="search"
             type="search"
             leftElement={<Icon icon="search" />}
-            onChange={(value) => setParams({...params, 'search': value.target.value })}
+            onChange={(value) => setParams(prev => { const next = new URLSearchParams(prev); next.set('search', value.target.value); return next; })}
             placeholder="Search"
             // rightElement={
             //   <span className="bp5-text-disabled bp5-align-center p-5 hidden-xs">
@@ -1261,7 +1261,7 @@ export const PaperContent = (props: PaperProps) => {
       <Col xs={11}>
         <Row between="xs" style={{height: '80px', alignItems: 'center'}}>
           <Rendered renderable={props.title}/>
-          {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px'}} onClick={() => setParams({...params, section: util.nextSection()})} /> : null}
+          {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.nextSection()); return next; })} /> : null}
         </Row>
       </Col>
       <Col xs={12}><Book {...props}/></Col>

@@ -282,7 +282,7 @@ const Almanac = () => {
       <span style={{textAlign: 'left'}}>So whether you're interested in developing web applications, compiler engineering<span className="bp5-text-muted">, (future) game programming</span> or formalizing mathematics. This should be for you!</span>
 
       <Section head="§0. For Beginners">
-        <span style={{textAlign: 'left'}}>If you're starting out learning a programming language for the first time, great! This section is for you. If not <Button rightIcon="arrow-right" text="Skip ahead to §1" minimal outlined onClick={() => setParams({...params, section: "§1. How to Install"})} />.</span>
+        <span style={{textAlign: 'left'}}>If you're starting out learning a programming language for the first time, great! This section is for you. If not <Button rightIcon="arrow-right" text="Skip ahead to §1" minimal outlined onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', '§1. How to Install'); return next; })} />.</span>
 
         <Section head="§0.1 ">
         </Section>
@@ -318,7 +318,7 @@ const Almanac = () => {
             "A" &+ "B" // Single object, multiple components<BR/>
             "A" + "B"  // Same as &+, but overwrites.
           </CodeBlock>
-          <span style={{textAlign: 'left'}}>The difference (and usefulness) of &, &+ is best stated with an example. (&) You can have multiple programs, and (&+) each program can be executing in many places. In the following section (<Button rightIcon="arrow-right" text="§2.2 Rays: Arrays, Trees, Graphs" minimal outlined onClick={() => setParams({...params, section: "§2.2 Rays: Arrays, Trees, Graphs"})} />) you'll see another use for it.</span>
+          <span style={{textAlign: 'left'}}>The difference (and usefulness) of &, &+ is best stated with an example. (&) You can have multiple programs, and (&+) each program can be executing in many places. In the following section (<Button rightIcon="arrow-right" text="§2.2 Rays: Arrays, Trees, Graphs" minimal outlined onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', '§2.2 Rays: Arrays, Trees, Graphs'); return next; })} />) you'll see another use for it.</span>
           <CodeBlock>
             Program                        // Single<BR/>
             Program & Program              // Many<BR/>
@@ -354,7 +354,7 @@ const Almanac = () => {
           <CodeBlock>
             x = "A" &+ numberline
           </CodeBlock>
-          <span style={{textAlign: 'left'}}>You can extract the components in two ways. (1) By using types. Which we'll talk about later <Button rightIcon="arrow-right" text="§2.4 Types: Patterns" minimal outlined onClick={() => setParams({...params, section: "§2.4 Types: Patterns"})} />. Or (2) by using the '##' operator.</span>
+          <span style={{textAlign: 'left'}}>You can extract the components in two ways. (1) By using types. Which we'll talk about later <Button rightIcon="arrow-right" text="§2.4 Types: Patterns" minimal outlined onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', '§2.4 Types: Patterns'); return next; })} />. Or (2) by using the '##' operator.</span>
 
           <CodeBlock>
             string: String = x<BR/>
