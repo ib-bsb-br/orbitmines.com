@@ -1,9 +1,10 @@
-import React from 'react';
-import {Button, Icon, InputGroup} from "@blueprintjs/core";
+import React, {useMemo} from 'react';
+import {Button, Icon} from "@blueprintjs/core";
 import {Block, Children, Col, CustomIcon, HorizontalLine, Row} from "../lib/post/Post";
 import {useNavigate} from "react-router-dom";
 import {Helmet} from "react-helmet";
 import ORGANIZATIONS, {TProfile} from "../lib/organizations/ORGANIZATIONS";
+import IDELayout, {generateId, LayoutNode, PanelDefinition} from "../lib/layout/IDELayout";
 
 const Socials = ({ profile }: { profile: TProfile }) => {
   return <Row center="xs" className="child-pt-1 child-px-2">
@@ -104,6 +105,38 @@ const ProjectList = () => <>
   </Row>
 </>
 
+const SettingsPanel = ({ profile }: { profile: TProfile }) => <>
+  <Row middle="xs" className="child-pr-3"><Icon icon="settings" /><h3>Settings</h3></Row>
+  <Row>
+    <Col xs={12}><h4 className="bp5-text-muted">Preferences</h4></Col>
+    <Col xs={12}>
+      <Row className="child-pr-4" middle="xs"><h4 className="bp5-text-muted">Reference Language</h4><Icon icon="edit" size={14} /></Row>
+      <Button minimal style={{width: '100%', justifyContent: 'start'}}><Row className="child-pr-2" start="xs" middle="xs" style={{width: '100%'}}>
+        <Icon icon="circle" size={14} /><span>Ray <span className="bp5-text-muted">v1.0.0</span></span>
+      </Row></Button>
+    </Col>
+    <Col xs={12}>
+      <Row className="child-pr-4" middle="xs"><h4 className="bp5-text-muted">Universal Language</h4><Icon icon="edit" size={14} /></Row>
+      <Button minimal style={{width: '100%', justifyContent: 'start'}}><Row className="child-pr-2" start="xs" middle="xs" style={{width: '100%'}}>
+        <Icon icon="circle" size={14} /><span>Ray <span className="bp5-text-muted">v1.0.0</span></span>
+      </Row></Button>
+    </Col>
+    <Col xs={12}><HorizontalLine/></Col>
+    <Col xs={12}><h4 className="bp5-text-muted">Selection</h4></Col>
+    <Col xs={12}>
+      <ProjectList/>
+    </Col>
+  </Row>
+</>
+
+const DisplayPanel = ({ profile }: { profile: TProfile }) => <>
+  <Row middle="xs" className="child-pr-3">
+    <Icon icon="circle" size={18} />
+    <h2>Ray</h2>
+  </Row>
+  <Row><Col className="pl-12"><Socials profile={profile}/></Col></Row>
+</>
+
 const Library = () => {
   const navigate = useNavigate();
 
@@ -114,12 +147,47 @@ const Library = () => {
     ]
   }
 
+  const panels = useMemo<PanelDefinition[]>(() => [
+    {
+      id: 'projects',
+      title: 'Projects',
+      icon: 'git-repo',
+      render: () => <ProjectList />,
+      closable: false,
+    },
+    {
+      id: 'display',
+      title: 'Ray',
+      icon: 'circle',
+      render: () => <DisplayPanel profile={profile} />,
+      closable: false,
+    },
+    {
+      id: 'settings',
+      title: 'Settings',
+      icon: 'settings',
+      render: () => <SettingsPanel profile={profile} />,
+      closable: false,
+    },
+  ], []);
+
+  const initialLayout = useMemo<LayoutNode>(() => ({
+    type: 'split',
+    id: generateId(),
+    direction: 'horizontal',
+    children: [
+      { type: 'tabgroup', id: generateId(), panels: ['projects'], activeIndex: 0 },
+      { type: 'tabgroup', id: generateId(), panels: ['display'], activeIndex: 0 },
+      { type: 'tabgroup', id: generateId(), panels: ['settings'], activeIndex: 0 },
+    ],
+    sizes: [0.25, 0.50, 0.25],
+  }), []);
+
   return <Row center="xs">
     <Helmet>
       <title lang="en">Ether Library: The Language Index</title>
     </Helmet>
 
-    {/* TODO: */}
     <Row className="py-10 px-15" style={{width: '100%'}}>
       <Row between="xs" style={{width: '100%'}}>
         <Button icon="arrow-left" minimal onClick={() => navigate('/')} />
@@ -130,49 +198,9 @@ const Library = () => {
         </Col>
       </Row>
 
-      <Row center="xs" style={{width: '100%'}} className="pt-20">
-        <Col xs={12} style={{maxWidth: '1650px'}}>
-          <Row style={{textAlign: 'start'}}>
-            <Col xs={3}></Col>
-            <Col xs={6}><Row middle="xs" className="child-pr-3">
-              <Icon icon="circle" size={18} />
-              <h2>Ray</h2>
-            </Row></Col>
-            <Col xs={3}><Row middle="xs" className="child-pr-3"><Icon icon="code" /><h3>Actions</h3></Row></Col>
-          </Row>
-          <Row style={{textAlign: 'start'}}>
-            <Col xs={3}>
-              <ProjectList/>
-            </Col>
-            <Col xs={6}>
-              <Row><Col className="pl-12"><Socials profile={profile}/></Col></Row>
-            </Col>
-            <Col xs={3}>
-              <Row middle="xs" className="child-pr-3"><Icon icon="settings" /><h3>Settings</h3></Row>
-              <Row>
-                <Col xs={12}><h4 className="bp5-text-muted">Preferences</h4></Col>
-                <Col xs={12}>
-                  <Row className="child-pr-4" middle="xs"><h4 className="bp5-text-muted">Reference Language</h4><Icon icon="edit" size={14} /></Row>
-                  <Button minimal style={{width: '100%', justifyContent: 'start'}}><Row className="child-pr-2" start="xs" middle="xs" style={{width: '100%'}}>
-                    <Icon icon="circle" size={14} /><span>Ray <span className="bp5-text-muted">v1.0.0</span></span>
-                  </Row></Button>
-                </Col>
-                <Col xs={12}>
-                  <Row className="child-pr-4" middle="xs"><h4 className="bp5-text-muted">Universal Language</h4><Icon icon="edit" size={14} /></Row>
-                  <Button minimal style={{width: '100%', justifyContent: 'start'}}><Row className="child-pr-2" start="xs" middle="xs" style={{width: '100%'}}>
-                    <Icon icon="circle" size={14} /><span>Ray <span className="bp5-text-muted">v1.0.0</span></span>
-                  </Row></Button>
-                </Col>
-                <Col xs={12}><HorizontalLine/></Col>
-                <Col xs={12}><h4 className="bp5-text-muted">Selection</h4></Col>
-                <Col xs={12}>
-                  <ProjectList/>
-                </Col>
-              </Row>
-            </Col>
-          </Row>
-        </Col>
-      </Row>
+      <div style={{width: '100%', height: 'calc(100vh - 120px)', maxWidth: '1650px', margin: '0 auto'}} className="pt-20">
+        <IDELayout panels={panels} initialLayout={initialLayout} />
+      </div>
     </Row>
   </Row>
 };

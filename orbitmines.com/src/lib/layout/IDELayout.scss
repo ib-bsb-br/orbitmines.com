@@ -1,0 +1,178 @@
+@import "~@blueprintjs/core/lib/scss/variables";
+
+.ide-layout {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+// Split containers
+.ide-split {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  &--horizontal {
+    flex-direction: row;
+  }
+
+  &--vertical {
+    flex-direction: column;
+  }
+}
+
+.ide-split__child {
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
+// Resize handles
+.ide-resize-handle {
+  flex: 0 0 4px;
+  position: relative;
+  z-index: 10;
+  background: $dark-gray4;
+  transition: background-color 0.15s ease;
+
+  &--horizontal {
+    cursor: col-resize;
+    width: 4px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: -4px;
+      right: -4px;
+    }
+  }
+
+  &--vertical {
+    cursor: row-resize;
+    height: 4px;
+
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: -4px;
+      bottom: -4px;
+    }
+  }
+
+  &:hover,
+  &--active {
+    background: $blue3;
+  }
+}
+
+// Tab groups
+.ide-tabgroup {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.ide-tabbar {
+  display: flex;
+  flex: 0 0 auto;
+  background: $dark-gray2;
+  border-bottom: 1px solid $dark-gray4;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-height: 32px;
+
+  &::-webkit-scrollbar {
+    height: 2px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: $dark-gray4;
+  }
+}
+
+.ide-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: $gray3;
+  background: $dark-gray2;
+  border-right: 1px solid $dark-gray4;
+  transition: background-color 0.1s ease, color 0.1s ease;
+
+  &:hover {
+    background: $dark-gray3;
+    color: $light-gray1;
+  }
+
+  &--active {
+    color: $light-gray1;
+    background: $dark-gray3;
+    border-bottom: 2px solid $blue3;
+  }
+
+  &--dragging {
+    opacity: 0.5;
+  }
+
+  &__icon {
+    flex: 0 0 auto;
+  }
+
+  &__title {
+    flex: 1 1 auto;
+  }
+
+  &__close {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.1s ease, background-color 0.1s ease;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba($light-gray1, 0.15);
+    }
+
+    .ide-tab:hover &,
+    .ide-tab--active & {
+      opacity: 1;
+    }
+  }
+}
+
+// Panel content area
+.ide-panel-content {
+  flex: 1 1 auto;
+  overflow: auto;
+  background: transparent;
+  padding: 8px;
+}
+
+// Drop indicator overlay
+.ide-drop-indicator {
+  position: absolute;
+  pointer-events: none;
+  z-index: 100;
+  background: rgba($blue3, 0.2);
+  border: 2px solid rgba($blue3, 0.6);
+  transition: all 0.1s ease;
+}
