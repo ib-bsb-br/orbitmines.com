@@ -1,10 +1,9 @@
-import Post, {Arc, BR, Col, HorizontalLine, PaperProps, Row, Section} from "./Post";
+import Post, {Arc, BR, Col, HorizontalLine, Paragraph, PaperProps, Row, Section} from "./Post";
 import React, {useEffect, useRef} from "react";
 import {useSearchParams} from "react-router-dom";
 import {Button} from "@blueprintjs/core";
 
-type Snippet = { before: string; match: string; after: string };
-type SearchResult = { sectionName: string; snippets: Snippet[] };
+type SearchResult = { sectionName: string; groups: React.ReactNode[][] };
 
 const extractText = (node: React.ReactNode): string => {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
@@ -96,32 +95,37 @@ export class BookUtil {
     if (!query.trim()) return [];
     const lowerQuery = query.toLowerCase();
     const results: SearchResult[] = [];
+    const CONTEXT = 5;
 
     for (const section of this.allSections()) {
       const content = this.getContentChildren(section);
-      const text = content.map(extractText).join(' ');
-      const lowerText = text.toLowerCase();
+      const matchingIndices: number[] = [];
 
-      const snippets: Snippet[] = [];
-      let startFrom = 0;
-      while (true) {
-        const idx = lowerText.indexOf(lowerQuery, startFrom);
-        if (idx === -1) break;
+      content.forEach((child, i) => {
+        if (extractText(child).toLowerCase().includes(lowerQuery)) {
+          matchingIndices.push(i);
+        }
+      });
 
-        const before = text.slice(Math.max(0, idx - 80), idx);
-        const match = text.slice(idx, idx + query.length);
-        const after = text.slice(idx + query.length, idx + query.length + 80);
-        snippets.push({
-          before: (idx > 80 ? '...' : '') + before,
-          match,
-          after: after + (idx + query.length + 80 < text.length ? '...' : '')
-        });
-        startFrom = idx + query.length;
+      if (matchingIndices.length === 0) continue;
+
+      const ranges: [number, number][] = matchingIndices.map(i => [
+        Math.max(0, i - CONTEXT),
+        Math.min(content.length - 1, i + CONTEXT)
+      ]);
+
+      const merged: [number, number][] = [ranges[0]];
+      for (let i = 1; i < ranges.length; i++) {
+        const last = merged[merged.length - 1];
+        if (ranges[i][0] <= last[1] + 1) {
+          last[1] = Math.max(last[1], ranges[i][1]);
+        } else {
+          merged.push(ranges[i]);
+        }
       }
 
-      if (snippets.length > 0) {
-        results.push({ sectionName: this.sectionName(section), snippets });
-      }
+      const groups = merged.map(([start, end]) => content.slice(start, end + 1));
+      results.push({ sectionName: this.sectionName(section), groups });
     }
     return results;
   };
@@ -153,6 +157,53 @@ export const Navigation = (props: PaperProps) => {
   </Row>
 }
 
+const highlightDomMatches = (container: HTMLElement, query: string) => {
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  const lowerQuery = query.toLowerCase();
+  const matches: { node: Text; indices: number[] }[] = [];
+
+  let textNode: Text | null;
+  while ((textNode = walker.nextNode() as Text | null)) {
+    const text = textNode.textContent || '';
+    const lowerText = text.toLowerCase();
+    const indices: number[] = [];
+    let from = 0;
+    while (true) {
+      const idx = lowerText.indexOf(lowerQuery, from);
+      if (idx === -1) break;
+      indices.push(idx);
+      from = idx + query.length;
+    }
+    if (indices.length > 0) matches.push({ node: textNode, indices });
+  }
+
+  for (const { node, indices } of [...matches].reverse()) {
+    for (const idx of [...indices].reverse()) {
+      try {
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + query.length);
+        const mark = document.createElement('mark');
+        mark.style.backgroundColor = 'rgba(255, 179, 71, 0.3)';
+        mark.style.color = 'inherit';
+        mark.style.padding = '1px 2px';
+        mark.style.borderRadius = '2px';
+        range.surroundContents(mark);
+      } catch (e) {}
+    }
+  }
+};
+
+const clearDomHighlights = (container: HTMLElement) => {
+  container.querySelectorAll('mark').forEach(mark => {
+    const parent = mark.parentNode;
+    if (parent) {
+      parent.replaceChild(document.createTextNode(mark.textContent || ''), mark);
+      parent.normalize();
+    }
+  });
+};
+
 const BookSearch = ({ props, params, setParams, onBack }: {
   props: PaperProps,
   params: URLSearchParams,
@@ -162,39 +213,38 @@ const BookSearch = ({ props, params, setParams, onBack }: {
   const search = params.get('search') || '';
   const util = new BookUtil(props, params);
   const results = util.searchAll(search);
-  const totalSnippets = results.reduce((sum, r) => sum + r.snippets.length, 0);
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const totalGroups = results.reduce((sum, r) => sum + r.groups.length, 0);
+
+  useEffect(() => {
+    if (!resultsRef.current || !search.trim()) return;
+    const container = resultsRef.current;
+    highlightDomMatches(container, search);
+    return () => clearDomHighlights(container);
+  }, [search]);
+
+  const allGroups = results.flatMap(result =>
+    result.groups.map(group => ({ sectionName: result.sectionName, children: group }))
+  );
 
   return <Row>
     <Col xs={12}>
       <Row between="xs" middle="xs" className="pb-10">
         <Button icon="arrow-left" text="Back" minimal style={{fontSize: '16px'}} onClick={onBack} />
         <span className="bp5-text-muted" style={{fontSize: '14px'}}>
-          {totalSnippets} result{totalSnippets !== 1 ? 's' : ''} for '{search}'
+          {totalGroups} result{totalGroups !== 1 ? 's' : ''} for '{search}'
         </span>
       </Row>
     </Col>
-    {results.length === 0 ? <Col xs={12}>
-      <Row center="xs" className="py-20">
-        <span className="bp5-text-muted" style={{fontSize: '16px'}}>No results found.</span>
-      </Row>
-    </Col> : results.map((result, ri) => <Col xs={12} key={ri} className="pb-10">
-      <div className="bp5-text-muted" style={{fontSize: '13px', paddingBottom: '4px'}}>{result.sectionName}</div>
-      {result.snippets.map((snippet, si) => <div key={si} style={{
-        padding: '8px 12px',
-        marginBottom: '6px',
-        borderLeft: '2px solid rgba(255, 179, 71, 0.4)',
-        fontSize: '14px',
-        lineHeight: '1.6'
-      }}>
-        <span style={{whiteSpace: 'pre-wrap'}}>
-          {snippet.before}<mark style={{
-            backgroundColor: 'rgba(255, 179, 71, 0.3)',
-            color: 'inherit',
-            padding: '1px 2px',
-            borderRadius: '2px'
-          }}>{snippet.match}</mark>{snippet.after}
-        </span>
-        <div style={{paddingTop: '4px'}}>
+    <div ref={resultsRef} style={{width: '100%'}}>
+      {allGroups.length === 0 ? <Col xs={12}>
+        <Row center="xs" className="py-20">
+          <span className="bp5-text-muted" style={{fontSize: '16px'}}>No results found.</span>
+        </Row>
+      </Col> : allGroups.map((group, i) => <Col xs={12} key={i}>
+        {i > 0 && <HorizontalLine />}
+        <Row between="xs" middle="xs" className="py-3">
+          <span className="bp5-text-muted" style={{fontSize: '13px'}}>{group.sectionName}</span>
           <Button
             rightIcon="arrow-right"
             text="Keep reading"
@@ -203,15 +253,18 @@ const BookSearch = ({ props, params, setParams, onBack }: {
             style={{fontSize: '13px'}}
             onClick={() => setParams(prev => {
               const next = new URLSearchParams(prev);
-              next.set('section', result.sectionName);
+              next.set('section', group.sectionName);
               next.set('highlight', search);
               next.delete('search');
               return next;
             })}
           />
+        </Row>
+        <div style={{textAlign: 'start'}}>
+          <Paragraph>{group.children}</Paragraph>
         </div>
-      </div>)}
-    </Col>)}
+      </Col>)}
+    </div>
   </Row>;
 };
 
@@ -260,46 +313,25 @@ const Book = (props: PaperProps) => {
     if (!highlight || !contentRef.current) return;
 
     const timer = setTimeout(() => {
-      const walker = document.createTreeWalker(
-        contentRef.current!,
-        NodeFilter.SHOW_TEXT,
-        null
-      );
+      const container = contentRef.current!;
+      highlightDomMatches(container, highlight);
 
-      const lowerHighlight = highlight.toLowerCase();
-      let node: Text | null;
-      while ((node = walker.nextNode() as Text | null)) {
-        const idx = node.textContent?.toLowerCase().indexOf(lowerHighlight) ?? -1;
-        if (idx === -1) continue;
+      const firstMark = container.querySelector('mark');
+      if (firstMark) {
+        firstMark.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
 
-        const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + highlight.length);
-
-        const mark = document.createElement('mark');
-        mark.style.backgroundColor = 'rgba(255, 179, 71, 0.4)';
-        mark.style.color = 'inherit';
-        mark.style.padding = '1px 2px';
-        mark.style.borderRadius = '2px';
-        range.surroundContents(mark);
-
-        mark.scrollIntoView({ block: 'center', behavior: 'smooth' });
-
-        setTimeout(() => {
-          const parent = mark.parentNode;
-          if (parent) {
-            parent.replaceChild(document.createTextNode(mark.textContent || ''), mark);
-            parent.normalize();
-          }
+      setTimeout(() => {
+        clearDomHighlights(container);
+        const currentSearch = new URLSearchParams(window.location.search).get('search');
+        if (!currentSearch) {
           setParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('highlight');
             return next;
           });
-        }, 3000);
-
-        break;
-      }
+        }
+      }, 6000);
     }, 100);
 
     return () => clearTimeout(timer);
