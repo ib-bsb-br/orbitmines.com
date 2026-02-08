@@ -321,10 +321,11 @@ const Book = (props: PaperProps) => {
         firstMark.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
 
+      const originalSection = new URLSearchParams(window.location.search).get('section');
       setTimeout(() => {
         clearDomHighlights(container);
-        const currentSearch = new URLSearchParams(window.location.search).get('search');
-        if (!currentSearch) {
+        const current = new URLSearchParams(window.location.search);
+        if (!current.get('search') && current.get('section') === originalSection) {
           setParams(prev => {
             const next = new URLSearchParams(prev);
             next.delete('highlight');
