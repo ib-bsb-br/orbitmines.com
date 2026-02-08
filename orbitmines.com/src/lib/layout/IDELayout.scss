@@ -167,7 +167,8 @@
 // Panel content area
 .ide-panel-content {
   flex: 1 1 auto;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   background: transparent;
   padding: 8px;
 }
@@ -187,4 +188,17 @@
   background: rgba(#8abbff, 0.2);
   border: 2px solid rgba(#8abbff, 0.6);
   transition: all 0.1s ease;
+}
+
+// Selectable entries
+.selectable-entry {
+  cursor: pointer;
+  margin-left: -9999px;
+  margin-right: -9999px;
+  padding-left: 9999px;
+  padding-right: 9999px;
+
+  &--selected {
+    background: rgba(#8abbff, 0.15);
+  }
 }

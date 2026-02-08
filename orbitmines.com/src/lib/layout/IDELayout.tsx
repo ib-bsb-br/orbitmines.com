@@ -32,7 +32,7 @@ export type LayoutNode = SplitNode | TabGroupNode;
 
 export interface PanelDefinition {
   id: string;
-  title: string;
+  title: React.ReactNode;
   icon?: string;
   render: () => React.ReactNode;
   closable?: boolean;
@@ -66,7 +66,6 @@ interface CollapseRecord {
 
 const MIN_COLLAPSE_HORIZONTAL_PX = 250;
 const MIN_COLLAPSE_VERTICAL_PX = 120;
-const RESTORE_HYSTERESIS_PX = 20;
 
 // ─── ID Generation ───────────────────────────────────────────────────────────
 
@@ -1124,6 +1123,7 @@ const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
       const stack = collapseStackRef.current;
 
       // Phase 1: Restore — if screen grew past the collapse point
+      let didRestore = false;
       let didChange = true;
       while (didChange && stack.length > 0) {
         didChange = false;
@@ -1131,12 +1131,13 @@ const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
         const dim =
           record.direction === 'horizontal' ? width : height;
 
-        if (dim > record.collapsedAtDim + RESTORE_HYSTERESIS_PX) {
+        if (dim >= record.collapsedAtDim) {
           const result = tryRestoreRecord(tree, record);
           if (result) {
             tree = result;
             stack.pop();
             didChange = true;
+            didRestore = true;
           } else {
             // Record is stale (user reorganized), discard it
             stack.pop();
@@ -1146,31 +1147,36 @@ const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
       }
 
       // Phase 2: Collapse — find anything too small
-      let collapsed = true;
-      while (collapsed) {
-        collapsed = false;
-        const target = findSmallestBelowThreshold(
-          tree,
-          width,
-          height
-        );
-        if (target && target.parentSplit.children.length > 1) {
-          const result = performSingleCollapse(
+      // Skip if we just restored panels to avoid bounce (restore then
+      // immediate re-collapse which ratchets collapsedAtDim upward
+      // until the record goes stale and the panel is permanently lost).
+      if (!didRestore) {
+        let collapsed = true;
+        while (collapsed) {
+          collapsed = false;
+          const target = findSmallestBelowThreshold(
             tree,
-            target,
             width,
             height
           );
-          if (result) {
-            tree = result.tree;
-            if (
-              !stack.some(
-                (r) => r.removedGroupId === result.record.removedGroupId
-              )
-            ) {
-              stack.push(result.record);
+          if (target && target.parentSplit.children.length > 1) {
+            const result = performSingleCollapse(
+              tree,
+              target,
+              width,
+              height
+            );
+            if (result) {
+              tree = result.tree;
+              if (
+                !stack.some(
+                  (r) => r.removedGroupId === result.record.removedGroupId
+                )
+              ) {
+                stack.push(result.record);
+              }
+              collapsed = true;
             }
-            collapsed = true;
           }
         }
       }

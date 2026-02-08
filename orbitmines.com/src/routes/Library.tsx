@@ -42,6 +42,7 @@ interface Entry {
   icon?: string;
   language?: LanguageRef;
   library?: string;
+  reference?: { name: string; icon?: string };
   versions?: Version[];
   snippet?: string;
 }
@@ -171,6 +172,35 @@ const PROJECTS: Entry[] = [
 
 const OpenEntryContext = React.createContext<((entry: Entry) => void) | null>(null);
 
+// ─── Selection Context ──────────────────────────────────────────────────────
+
+const SelectionContext = React.createContext<{
+  selectedKeys: Set<string>;
+  onSelect: (key: string, e: React.MouseEvent) => void;
+}>({ selectedKeys: new Set(), onSelect: () => {} });
+
+const SelectableEntry = ({ entry, children }: { entry: Entry; children: React.ReactNode }) => {
+  const id = React.useId();
+  const { selectedKeys, onSelect } = useContext(SelectionContext);
+  const openEntryFn = useContext(OpenEntryContext);
+  const isSelected = selectedKeys.has(id);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    onSelect(id, e);
+    openEntryFn?.(entry);
+  }, [id, entry, onSelect, openEntryFn]);
+
+  return (
+    <div
+      data-entry-key={id}
+      onClick={handleClick}
+      className={`selectable-entry${isSelected ? ' selectable-entry--selected' : ''}`}
+    >
+      {children}
+    </div>
+  );
+};
+
 // ─── Rendering Components ────────────────────────────────────────────────────
 
 const snippetStyle = {width: '100%', fontSize: '12px', padding: '10px', margin: '5px'};
@@ -186,26 +216,34 @@ const EntryName = ({ entry }: { entry: Entry }) => {
       {isFile ? <span className="bp5-text-disabled">{entry.name}</span> : entry.name}
     </span>;
   }
+  if (entry.reference) {
+    return <span>
+      {entry.name} <span className="bp5-text-muted">-{'>'}</span>{' '}
+      <Icon icon={(entry.reference.icon || 'circle') as any} size={12} />{' '}
+      {entry.reference.name}
+    </span>;
+  }
   return isFile ? <span className="bp5-text-disabled">{entry.name}</span> : <span>{entry.name}</span>;
 }
 
 const LibraryEntryView = ({ entry }: { entry: LibraryEntryData }) => {
-  const openEntry = useContext(OpenEntryContext);
   const icon = entry.icon || 'circle';
-  const handleClick = () => {
-    const refName = entry.reference ? `${entry.name} -> ${entry.reference.name}` : entry.name;
-    openEntry?.({ type: 'library', name: refName, icon: entry.icon || entry.reference?.icon, snippet: entry.snippet });
+  const entryForTab: Entry = {
+    type: 'library',
+    name: entry.name,
+    icon: icon,
+    reference: entry.reference,
+    snippet: entry.snippet,
   };
-  return <>
-    <Row middle="xs" className="child-pr-3" style={{cursor: 'pointer'}} onClick={handleClick}>
-      <Icon icon={icon as any} size={14} />
-      {entry.reference
-        ? <><span>{entry.name} <span className="bp5-text-muted">-{'>'}</span></span><Icon icon={(entry.reference.icon || 'circle') as any} size={14} />{entry.reference.name}</>
-        : entry.name
-      }
-    </Row>
-    {entry.snippet && <Snippet text={entry.snippet} />}
-  </>;
+  return (
+    <SelectableEntry entry={entryForTab}>
+      <Row middle="xs" className="child-pr-3">
+        <Icon icon={icon as any} size={14} />
+        <EntryName entry={entryForTab} />
+      </Row>
+      {entry.snippet && <Snippet text={entry.snippet} />}
+    </SelectableEntry>
+  );
 }
 
 const LibrariesView = ({ data }: { data: LibrariesGroup }) => <>
@@ -213,17 +251,16 @@ const LibrariesView = ({ data }: { data: LibrariesGroup }) => <>
     <Icon icon="git-repo" size={14} />
     <span>Libraries{data.count !== undefined && <span className="bp5-text-muted"> ({data.count.toLocaleString()})</span>}</span>
   </Row>
-  <Row className="pl-8">
+  <div className="pl-8">
     {data.entries.map((entry, i) =>
       <LibraryEntryView key={i} entry={entry} />
     )}
-  </Row>
+  </div>
 </>
 
 const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defaultLanguage?: LanguageRef; isTopLevel?: boolean }) => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedLangName, setSelectedLangName] = useState<string | null>(null);
-  const openEntry = useContext(OpenEntryContext);
 
   const hasVersions = entry.versions && entry.versions.length > 0;
   const entryLang = entry.language || defaultLanguage;
@@ -278,42 +315,86 @@ const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defau
     : <EntryName entry={entry} />;
 
   return <>
-    <Row middle="xs" between="xs">
-      {hasVersions ? (
-        <>
-          <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}} onClick={() => openEntry?.(entry)}>
-            <Row middle="xs" className="child-pr-3">
+    <SelectableEntry entry={entry}>
+      <Row middle="xs" between="xs">
+        {hasVersions ? (
+          <>
+            <Row middle="xs" className="child-pr-3 pl-3" style={{flex: '1 1 auto'}}>
               <Icon icon={icon as any} size={isTopLevel ? 16 : 14} />
               {nameElement}
             </Row>
-          </Button>
-          <Col>
-            <Row>
-              <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
-              <Col>
-                <Row center="xs">
-                  <Popover
-                    content={
-                      <Menu>
-                        {tagGroups.map(({ tag, langs }) => (
+            <Col onClick={e => e.stopPropagation()}>
+              <Row>
+                <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
+                <Col>
+                  <Row center="xs">
+                    <Popover
+                      content={
+                        <Menu>
+                          {tagGroups.map(({ tag, langs }) => (
+                            <MenuItem
+                              key={tag}
+                              text={tag}
+                              icon="git-branch"
+                              active={tag === currentTag}
+                              labelElement={
+                                <span style={{display: 'flex', gap: '4px'}}>
+                                  {langs.map(lang => (
+                                    <Tag
+                                      key={lang.name}
+                                      minimal
+                                      round
+                                      interactive
+                                      icon={<Icon icon={lang.icon as any} size={10} />}
+                                      intent={tag === currentTag && lang.name === currentLangName ? 'primary' : 'none'}
+                                      onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        setSelectedTag(tag);
+                                        setSelectedLangName(lang.name);
+                                      }}
+                                    >
+                                      {lang.name}
+                                    </Tag>
+                                  ))}
+                                </span>
+                              }
+                              onClick={() => setSelectedTag(tag)}
+                            />
+                          ))}
+                        </Menu>
+                      }
+                      placement="bottom-start"
+                      minimal
+                    >
+                      <Button minimal className="pb-0">
+                        <Row center="xs" middle="xs" className="bp5-text-muted">
+                          <Icon icon="git-branch" className="pr-3" size={12}/>
+                          <h5>{currentTag}</h5>
+                          <Icon icon="caret-down" />
+                        </Row>
+                      </Button>
+                    </Popover>
+                  </Row>
+                  <Row center="xs" middle="xs">
+                    <Popover
+                      content={
+                        <Menu>
                           <MenuItem
-                            key={tag}
-                            text={tag}
+                            text={currentTag}
                             icon="git-branch"
-                            active={tag === currentTag}
+                            active
                             labelElement={
                               <span style={{display: 'flex', gap: '4px'}}>
-                                {langs.map(lang => (
+                                {langsForCurrentTag.map(lang => (
                                   <Tag
                                     key={lang.name}
                                     minimal
                                     round
                                     interactive
                                     icon={<Icon icon={lang.icon as any} size={10} />}
-                                    intent={tag === currentTag && lang.name === currentLangName ? 'primary' : 'none'}
+                                    intent={lang.name === currentLangName ? 'primary' : 'none'}
                                     onClick={(e: React.MouseEvent) => {
                                       e.stopPropagation();
-                                      setSelectedTag(tag);
                                       setSelectedLangName(lang.name);
                                     }}
                                   >
@@ -322,88 +403,42 @@ const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defau
                                 ))}
                               </span>
                             }
-                            onClick={() => setSelectedTag(tag)}
                           />
-                        ))}
-                      </Menu>
-                    }
-                    placement="bottom-start"
-                    minimal
-                  >
-                    <Button minimal className="pb-0">
-                      <Row center="xs" middle="xs" className="bp5-text-muted">
-                        <Icon icon="git-branch" className="pr-3" size={12}/>
-                        <h5>{currentTag}</h5>
-                        <Icon icon="caret-down" />
-                      </Row>
-                    </Button>
-                  </Popover>
-                </Row>
-                <Row center="xs" middle="xs">
-                  <Popover
-                    content={
-                      <Menu>
-                        <MenuItem
-                          text={currentTag}
-                          icon="git-branch"
-                          active
-                          labelElement={
-                            <span style={{display: 'flex', gap: '4px'}}>
-                              {langsForCurrentTag.map(lang => (
-                                <Tag
-                                  key={lang.name}
-                                  minimal
-                                  round
-                                  interactive
-                                  icon={<Icon icon={lang.icon as any} size={10} />}
-                                  intent={lang.name === currentLangName ? 'primary' : 'none'}
-                                  onClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation();
-                                    setSelectedLangName(lang.name);
-                                  }}
-                                >
-                                  {lang.name}
-                                </Tag>
-                              ))}
-                            </span>
-                          }
-                        />
-                      </Menu>
-                    }
-                    placement="bottom-start"
-                    minimal
-                  >
-                    <Button minimal style={{fontSize: '10px', height: '100%'}}
-                      icon={<Icon icon={currentLang.icon as any} size={10} />}
-                      className="p-0">
-                      {currentLang.name}
-                      <Icon icon="caret-down" size={10} />
-                    </Button>
-                  </Popover>
-                </Row>
-              </Col>
-            </Row>
-          </Col>
-        </>
-      ) : (
-        <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}} onClick={() => openEntry?.(entry)}>
-          <Row middle="xs" className="child-pr-3">
+                        </Menu>
+                      }
+                      placement="bottom-start"
+                      minimal
+                    >
+                      <Button minimal style={{fontSize: '10px', height: '100%'}}
+                        icon={<Icon icon={currentLang.icon as any} size={10} />}
+                        className="p-0">
+                        {currentLang.name}
+                        <Icon icon="caret-down" size={10} />
+                      </Button>
+                    </Popover>
+                  </Row>
+                </Col>
+              </Row>
+            </Col>
+          </>
+        ) : (
+          <Row middle="xs" className="child-pr-3 pl-3" style={{flex: '1 1 auto'}}>
             <Icon icon={icon as any} size={isTopLevel ? 16 : 14} className={isFile ? "bp5-text-disabled" : undefined} />
             {nameElement}
           </Row>
-        </Button>
-      )}
-    </Row>
-    {entry.snippet && <Snippet text={entry.snippet} />}
-    {selectedVersion?.children && selectedVersion.children.length > 0 && <Row>
-      <Col xs={12} className="pl-8">
+        )}
+      </Row>
+      {entry.snippet && <Snippet text={entry.snippet} />}
+    </SelectableEntry>
+    {selectedVersion?.children && selectedVersion.children.length > 0 &&
+      <div className="pl-8">
         {selectedVersion.children.map((child, i) =>
           child.type === 'libraries'
             ? <LibrariesView key={i} data={child as LibrariesGroup} />
             : <EntryView key={i} entry={child as Entry} defaultLanguage={entryLang} />
         )}
-      </Col>
-    </Row>}
+      </div>
+    }
   </>;
 }
 
@@ -449,6 +484,39 @@ const Library = () => {
   const navigate = useNavigate();
   const layoutRef = useRef<IDELayoutHandle>(null);
   const [dynamicPanels, setDynamicPanels] = useState<PanelDefinition[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
+  const lastSelectedKeyRef = useRef<string | null>(null);
+
+  const onSelect = useCallback((key: string, e: React.MouseEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      setSelectedKeys(prev => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+      lastSelectedKeyRef.current = key;
+    } else if (e.shiftKey && lastSelectedKeyRef.current) {
+      const allEls = Array.from(document.querySelectorAll('[data-entry-key]'));
+      const allKeys = allEls.map(el => el.getAttribute('data-entry-key')!);
+      const startIdx = allKeys.indexOf(lastSelectedKeyRef.current);
+      const endIdx = allKeys.indexOf(key);
+      if (startIdx !== -1 && endIdx !== -1) {
+        const [from, to] = startIdx < endIdx ? [startIdx, endIdx] : [endIdx, startIdx];
+        const rangeKeys = allKeys.slice(from, to + 1);
+        setSelectedKeys(prev => {
+          const next = new Set(prev);
+          rangeKeys.forEach(k => next.add(k));
+          return next;
+        });
+      }
+    } else {
+      setSelectedKeys(new Set([key]));
+      lastSelectedKeyRef.current = key;
+    }
+  }, []);
+
+  const selectionState = useMemo(() => ({ selectedKeys, onSelect }), [selectedKeys, onSelect]);
 
   const profile: TProfile = {
     external: [
@@ -458,8 +526,11 @@ const Library = () => {
   }
 
   const openEntry = useCallback((entry: Entry) => {
-    const panelId = entry.library ? `entry-${entry.library}-${entry.name}` : `entry-${entry.name}`;
-    const title = entry.library ? `${entry.library} // ${entry.name}` : entry.name;
+    const panelId = entry.library
+      ? `entry-${entry.library}-${entry.name}`
+      : entry.reference
+        ? `entry-${entry.name}-${entry.reference.name}`
+        : `entry-${entry.name}`;
 
     // Check if panel already registered, if not add it
     setDynamicPanels(prev => {
@@ -468,7 +539,7 @@ const Library = () => {
       const defaultIcon = isLibrary ? 'git-repo' : 'circle';
       return [...prev, {
         id: panelId,
-        title,
+        title: <EntryName entry={entry} />,
         icon: entry.icon || defaultIcon,
         render: () => <EntryView entry={entry} isTopLevel />,
       }];
@@ -537,9 +608,11 @@ const Library = () => {
       </Row>
 
       <div style={{width: '100%', height: 'calc(100vh - 80px)', maxWidth: '1650px', margin: '0 auto'}} className="pt-20">
-        <OpenEntryContext.Provider value={openEntry}>
-          <IDELayout ref={layoutRef} panels={allPanels} initialLayout={initialLayout} />
-        </OpenEntryContext.Provider>
+        <SelectionContext.Provider value={selectionState}>
+          <OpenEntryContext.Provider value={openEntry}>
+            <IDELayout ref={layoutRef} panels={allPanels} initialLayout={initialLayout} />
+          </OpenEntryContext.Provider>
+        </SelectionContext.Provider>
       </div>
     </Row>
   </Row>
