@@ -887,7 +887,7 @@ export const Exports = (
             //     Ctrl + F
             //   </span>
             // }
-            value={params.get('search')}
+            value={params.get('search') ?? ''}
           /></Col> : <></>}
           <Col>
             {generate && ['button', 'thumbnail'].includes(generate) ? <>
@@ -1261,7 +1261,7 @@ export const PaperContent = (props: PaperProps) => {
       <Col xs={11}>
         <Row between="xs" style={{height: '80px', alignItems: 'center'}}>
           <Rendered renderable={props.title}/>
-          {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.nextSection()); return next; })} /> : null}
+          {util.next() ? <Button rightIcon="arrow-right" text={util.nextSection()} minimal style={{fontSize: '18px'}} onClick={() => setParams(prev => { const next = new URLSearchParams(prev); next.set('section', util.nextSection()); next.delete('search'); return next; })} /> : null}
         </Row>
       </Col>
       <Col xs={12}><Book {...props}/></Col>
