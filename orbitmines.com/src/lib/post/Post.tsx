@@ -1294,10 +1294,10 @@ export const PaperContent = (props: PaperProps) => {
 
   return <>
     <Row style={{maxWidth: '1650px'}}>
-      {book && navigation ? <Col xs={0} sm={5} md={4}>
+      {book && navigation && generate !== 'button' ? <Col xs={0} sm={5} md={4}>
         <Navigation {...props} />
       </Col> : <></>}
-      <Col md={book && navigation ? 8 : 12} sm={book && navigation ? 7 : 12} xs={12}>
+      <Col md={book && navigation && generate !== 'button' ? 8 : 12} sm={book && navigation && generate !== 'button' ? 7 : 12} xs={12}>
         <Grid fluid className={`${book && !isStartPage ? 'pb-35' : 'py-35'} child-pb-15 ${book ? '' : 'px-50-lg'}`} style={{
           // border: 'solid rgba(143, 153, 168, 0.15) 2px',
           //     height={1754} width={1240}

@@ -363,6 +363,22 @@ const Book = (props: PaperProps) => {
     preSearchState.current = null;
   };
 
+  const generate = params.get('generate');
+
+  if (generate === 'button')
+    return <Row>
+      <Col xs={12}>
+        <Navigation {...props} />
+      </Col>
+      <Col xs={12}><HorizontalLine/></Col>
+      {util.allSections().map((sec: any, i: number) => <Col xs={12} key={i}>
+        <Section head={sec.props.head}>
+          {React.Children.toArray(sec.props.children).filter((child: any) => !React.isValidElement(child) || child.type !== Section)}
+        </Section>
+        <HorizontalLine/>
+      </Col>)}
+    </Row>
+
   if (isSearching)
     return <BookSearch props={props} params={params} setParams={setParams} onBack={handleBack} />;
 
