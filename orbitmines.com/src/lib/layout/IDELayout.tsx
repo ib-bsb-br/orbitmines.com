@@ -1,8 +1,10 @@
 import React, {
   createContext,
+  forwardRef,
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -184,6 +186,24 @@ export function normalizeTree(node: LayoutNode): LayoutNode | null {
     children: flatChildren,
     sizes: flatSizes,
   };
+}
+
+export function findPanelInLayout(
+  root: LayoutNode,
+  panelId: string
+): { groupId: string; index: number } | null {
+  if (root.type === 'tabgroup') {
+    const idx = root.panels.indexOf(panelId);
+    if (idx !== -1) return { groupId: root.id, index: idx };
+    return null;
+  }
+  if (root.type === 'split') {
+    for (const child of root.children) {
+      const found = findPanelInLayout(child, panelId);
+      if (found) return found;
+    }
+  }
+  return null;
 }
 
 // ─── Responsive Collapse Helpers ─────────────────────────────────────────────
@@ -816,6 +836,7 @@ const TabGroup: React.FC<TabGroupProps> = ({ node }) => {
     <div
       ref={containerRef}
       className="ide-tabgroup"
+      data-group-id={node.id}
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
@@ -903,17 +924,21 @@ const LayoutNodeRenderer: React.FC<LayoutNodeRendererProps> = ({ node }) => {
 
 // ─── IDELayout Root Component ────────────────────────────────────────────────
 
+export interface IDELayoutHandle {
+  addPanelToLargestGroup: (panelId: string) => void;
+}
+
 export interface IDELayoutProps {
   panels: PanelDefinition[];
   initialLayout: LayoutNode;
   minPanelSize?: number;
 }
 
-const IDELayout: React.FC<IDELayoutProps> = ({
+const IDELayout = forwardRef<IDELayoutHandle, IDELayoutProps>(({
   panels,
   initialLayout,
   minPanelSize = 0.05,
-}) => {
+}, ref) => {
   const [layout, setLayout] = useState<LayoutNode>(initialLayout);
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [dropZone, setDropZone] = useState<DropZone | null>(null);
@@ -1189,6 +1214,53 @@ const IDELayout: React.FC<IDELayoutProps> = ({
     };
   }, [handleResize]);
 
+  // ─── Imperative API ──────────────────────────────────────────────────────────
+
+  const addPanelToLargestGroup = useCallback((panelId: string) => {
+    const containerEl = containerRef.current;
+    if (!containerEl) return;
+
+    const tabGroupEls = containerEl.querySelectorAll('.ide-tabgroup[data-group-id]');
+    let widestId = '';
+    let widestWidth = 0;
+
+    tabGroupEls.forEach(el => {
+      const groupId = el.getAttribute('data-group-id');
+      if (!groupId) return;
+      const width = el.getBoundingClientRect().width;
+      if (width > widestWidth) {
+        widestWidth = width;
+        widestId = groupId;
+      }
+    });
+
+    if (!widestId) return;
+
+    setLayout(prev => {
+      const existing = findPanelInLayout(prev, panelId);
+      if (existing) {
+        const group = findNode(prev, existing.groupId);
+        if (group && group.type === 'tabgroup') {
+          return replaceNode(prev, existing.groupId, { ...group, activeIndex: existing.index });
+        }
+        return prev;
+      }
+
+      const group = findNode(prev, widestId);
+      if (!group || group.type !== 'tabgroup') return prev;
+
+      return replaceNode(prev, widestId, {
+        ...group,
+        panels: [panelId, ...group.panels],
+        activeIndex: 0,
+      });
+    });
+  }, []);
+
+  useImperativeHandle(ref, () => ({
+    addPanelToLargestGroup,
+  }), [addPanelToLargestGroup]);
+
   // ────────────────────────────────────────────────────────────────────────────
 
   const contextValue = useMemo<IDELayoutContextValue>(
@@ -1225,6 +1297,6 @@ const IDELayout: React.FC<IDELayoutProps> = ({
       </div>
     </IDELayoutContext.Provider>
   );
-};
+});
 
 export default IDELayout;

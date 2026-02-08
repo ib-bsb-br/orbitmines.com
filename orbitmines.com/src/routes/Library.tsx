@@ -1,10 +1,10 @@
-import React, {useMemo, useState} from 'react';
+import React, {useCallback, useContext, useMemo, useRef, useState} from 'react';
 import {Button, Icon, Menu, MenuItem, Popover, Tag} from "@blueprintjs/core";
 import {Block, Col, CustomIcon, HorizontalLine, Row} from "../lib/post/Post";
 import {useNavigate} from "react-router-dom";
 import {Helmet} from "react-helmet";
 import ORGANIZATIONS, {TProfile} from "../lib/organizations/ORGANIZATIONS";
-import IDELayout, {generateId, LayoutNode, PanelDefinition} from "../lib/layout/IDELayout";
+import IDELayout, {generateId, IDELayoutHandle, LayoutNode, PanelDefinition} from "../lib/layout/IDELayout";
 
 const Socials = ({ profile }: { profile: TProfile }) => {
   return <Row center="xs" className="child-pt-1 child-px-2">
@@ -167,6 +167,10 @@ const PROJECTS: Entry[] = [
   },
 ];
 
+// ─── Open Entry Context ─────────────────────────────────────────────────────
+
+const OpenEntryContext = React.createContext<((entry: Entry) => void) | null>(null);
+
 // ─── Rendering Components ────────────────────────────────────────────────────
 
 const snippetStyle = {width: '100%', fontSize: '12px', padding: '10px', margin: '5px'};
@@ -186,9 +190,14 @@ const EntryName = ({ entry }: { entry: Entry }) => {
 }
 
 const LibraryEntryView = ({ entry }: { entry: LibraryEntryData }) => {
+  const openEntry = useContext(OpenEntryContext);
   const icon = entry.icon || 'circle';
+  const handleClick = () => {
+    const refName = entry.reference ? `${entry.name} -> ${entry.reference.name}` : entry.name;
+    openEntry?.({ type: 'library', name: refName, icon: entry.icon || entry.reference?.icon, snippet: entry.snippet });
+  };
   return <>
-    <Row middle="xs" className="child-pr-3">
+    <Row middle="xs" className="child-pr-3" style={{cursor: 'pointer'}} onClick={handleClick}>
       <Icon icon={icon as any} size={14} />
       {entry.reference
         ? <><span>{entry.name} <span className="bp5-text-muted">-{'>'}</span></span><Icon icon={(entry.reference.icon || 'circle') as any} size={14} />{entry.reference.name}</>
@@ -214,6 +223,7 @@ const LibrariesView = ({ data }: { data: LibrariesGroup }) => <>
 const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defaultLanguage?: LanguageRef; isTopLevel?: boolean }) => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [selectedLangName, setSelectedLangName] = useState<string | null>(null);
+  const openEntry = useContext(OpenEntryContext);
 
   const hasVersions = entry.versions && entry.versions.length > 0;
   const entryLang = entry.language || defaultLanguage;
@@ -271,7 +281,7 @@ const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defau
     <Row middle="xs" between="xs">
       {hasVersions ? (
         <>
-          <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
+          <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}} onClick={() => openEntry?.(entry)}>
             <Row middle="xs" className="child-pr-3">
               <Icon icon={icon as any} size={isTopLevel ? 16 : 14} />
               {nameElement}
@@ -376,7 +386,7 @@ const EntryView = ({ entry, defaultLanguage, isTopLevel }: { entry: Entry; defau
           </Col>
         </>
       ) : (
-        <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
+        <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}} onClick={() => openEntry?.(entry)}>
           <Row middle="xs" className="child-pr-3">
             <Icon icon={icon as any} size={isTopLevel ? 16 : 14} className={isFile ? "bp5-text-disabled" : undefined} />
             {nameElement}
@@ -437,6 +447,8 @@ const DisplayPanel = ({ profile }: { profile: TProfile }) => <>
 
 const Library = () => {
   const navigate = useNavigate();
+  const layoutRef = useRef<IDELayoutHandle>(null);
+  const [dynamicPanels, setDynamicPanels] = useState<PanelDefinition[]>([]);
 
   const profile: TProfile = {
     external: [
@@ -445,7 +457,30 @@ const Library = () => {
     ]
   }
 
-  const panels = useMemo<PanelDefinition[]>(() => [
+  const openEntry = useCallback((entry: Entry) => {
+    const panelId = entry.library ? `entry-${entry.library}-${entry.name}` : `entry-${entry.name}`;
+    const title = entry.library ? `${entry.library} // ${entry.name}` : entry.name;
+
+    // Check if panel already registered, if not add it
+    setDynamicPanels(prev => {
+      if (prev.some(p => p.id === panelId)) return prev;
+      const isLibrary = entry.type === 'library';
+      const defaultIcon = isLibrary ? 'git-repo' : 'circle';
+      return [...prev, {
+        id: panelId,
+        title,
+        icon: entry.icon || defaultIcon,
+        render: () => <EntryView entry={entry} isTopLevel />,
+      }];
+    });
+
+    // Use setTimeout to ensure panel is registered before adding to layout
+    setTimeout(() => {
+      layoutRef.current?.addPanelToLargestGroup(panelId);
+    }, 0);
+  }, []);
+
+  const staticPanels = useMemo<PanelDefinition[]>(() => [
     {
       id: 'projects',
       title: 'Projects',
@@ -468,6 +503,11 @@ const Library = () => {
       closable: false,
     },
   ], []);
+
+  const allPanels = useMemo<PanelDefinition[]>(
+    () => [...staticPanels, ...dynamicPanels],
+    [staticPanels, dynamicPanels]
+  );
 
   const initialLayout = useMemo<LayoutNode>(() => ({
     type: 'split',
@@ -497,7 +537,9 @@ const Library = () => {
       </Row>
 
       <div style={{width: '100%', height: 'calc(100vh - 80px)', maxWidth: '1650px', margin: '0 auto'}} className="pt-20">
-        <IDELayout panels={panels} initialLayout={initialLayout} />
+        <OpenEntryContext.Provider value={openEntry}>
+          <IDELayout ref={layoutRef} panels={allPanels} initialLayout={initialLayout} />
+        </OpenEntryContext.Provider>
       </div>
     </Row>
   </Row>
