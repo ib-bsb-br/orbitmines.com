@@ -1,5 +1,5 @@
-import React, {useMemo} from 'react';
-import {Button, Icon} from "@blueprintjs/core";
+import React, {useMemo, useState} from 'react';
+import {Button, Icon, Menu, MenuItem, Popover} from "@blueprintjs/core";
 import {Block, Children, Col, CustomIcon, HorizontalLine, Row} from "../lib/post/Post";
 import {useNavigate} from "react-router-dom";
 import {Helmet} from "react-helmet";
@@ -19,11 +19,18 @@ const Socials = ({ profile }: { profile: TProfile }) => {
 
 // ─── Project Data Model ──────────────────────────────────────────────────────
 
+interface VersionInfo {
+  tag: string;
+  language?: string;
+  languageIcon?: string;
+}
+
 interface ProjectEntry {
   name: string;
   icon?: string;
-  version?: string;
   language?: string;
+  languageIcon?: string;
+  versions?: VersionInfo[];
   children?: ProjectChild[];
 }
 
@@ -32,12 +39,12 @@ type ProjectChild = FileChild | LibrariesChild;
 interface FileChild {
   type: 'file';
   name: string;
+  library?: string;
   icon?: string;
-  version?: string;
   language?: string;
-  disabled?: boolean;
+  languageIcon?: string;
+  versions?: VersionInfo[];
   snippet?: string;
-  reference?: { name: string; icon?: string };
 }
 
 interface LibrariesChild {
@@ -58,14 +65,17 @@ interface LibraryEntryData {
 const PROJECTS: ProjectEntry[] = [
   {
     name: 'Ray',
-    version: 'v1.0.0',
-    language: 'Language',
+    language: 'Ray',
+    languageIcon: 'circle',
+    versions: [
+      { tag: 'v1.0.0' },
+      { tag: 'v0.9.0', language: 'Set Theory' },
+    ],
     children: [
       {
         type: 'file',
         name: 'UUID.ray',
         icon: 'document',
-        disabled: true,
         snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
       },
       {
@@ -87,26 +97,39 @@ const PROJECTS: ProjectEntry[] = [
   },
   {
     name: 'Set Theory',
+    language: 'Set Theory',
+    languageIcon: 'circle',
+    versions: [
+      { tag: 'v2.0.0', language: 'Ray' },
+      { tag: 'v1.0.0' },
+    ],
     children: [
       {
         type: 'file',
         name: 'set.mm',
-        version: 'v1.0.0',
-        language: 'Language',
+        versions: [
+          { tag: 'v1.0.0', language: 'Ray' },
+        ],
         snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
       },
     ],
   },
   {
     name: 'UUID',
-    version: 'v1.0.0',
-    language: 'Language',
+    language: 'UUID',
+    languageIcon: 'circle',
+    versions: [
+      { tag: 'v1.0.0', language: 'Ray' },
+      { tag: 'v0.1.0' },
+    ],
     children: [
       {
         type: 'file',
-        name: 'Ray // UUID.ray',
-        version: 'v1.0.0',
-        language: 'Language',
+        name: 'UUID.ray',
+        library: 'Ray',
+        versions: [
+          { tag: 'v1.0.0', language: 'Ray' },
+        ],
         snippet: 'UUID: UUID("asadasdasdasdasdddaaaaaaaaaaaaa"',
       },
     ],
@@ -117,30 +140,73 @@ const PROJECTS: ProjectEntry[] = [
 
 const snippetStyle = {width: '100%', fontSize: '12px', padding: '10px', margin: '5px'};
 
-const Language = ({children, version, language}: Children & { version?: string; language?: string }) => {
-  const hasControls = version || language;
+const FileName = ({ name, library }: { name: string; library?: string }) => {
+  if (library) {
+    return <span>{library} <span className="bp5-text-muted">{'//'}</span> <span className="bp5-text-disabled">{name}</span></span>;
+  }
+  return <span className="bp5-text-disabled">{name}</span>;
+}
+
+interface LanguageProps {
+  versions?: VersionInfo[];
+  defaultLanguage?: string;
+  defaultLanguageIcon?: string;
+}
+
+const Language = ({children, versions, defaultLanguage, defaultLanguageIcon}: Children & LanguageProps) => {
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const hasVersions = versions && versions.length > 0;
+  const selected = hasVersions ? versions[Math.min(selectedIdx, versions.length - 1)] : null;
+  const resolvedLanguage = selected ? (selected.language || defaultLanguage || '') : '';
+  const resolvedIcon = selected ? (selected.languageIcon || defaultLanguageIcon || 'circle') : 'circle';
+
   return <>
     <Button minimal className="p-0" style={{minWidth: '0', flex: '1 1 auto', justifyContent: 'left'}}>
       <Row middle="xs" className="child-pr-3">
         {children}
       </Row>
     </Button>
-    {hasControls && <Col>
+    {hasVersions && selected && <Col>
       <Row>
         <Button minimal><Icon icon="add" intent="success" size={16}/></Button>
         <Col>
-          {version && <Row center="xs">
-            <Button minimal className="pb-0">
-              <Row center="xs" middle="xs" className="bp5-text-muted">
-                <Icon icon="git-branch" className="pr-3" size={12}/><h5>{version}</h5><Icon icon="caret-down" />
-              </Row>
+          <Row center="xs">
+            <Popover
+              content={
+                <Menu>
+                  {versions!.map((v, i) => {
+                    const vLang = v.language || defaultLanguage || '';
+                    const vIcon = v.languageIcon || defaultLanguageIcon || 'circle';
+                    return <MenuItem
+                      key={i}
+                      text={v.tag}
+                      label={vLang}
+                      icon={vIcon as any}
+                      active={i === selectedIdx}
+                      onClick={() => setSelectedIdx(i)}
+                    />;
+                  })}
+                </Menu>
+              }
+              placement="bottom-start"
+              minimal
+            >
+              <Button minimal className="pb-0">
+                <Row center="xs" middle="xs" className="bp5-text-muted">
+                  <Icon icon="git-branch" className="pr-3" size={12}/>
+                  <h5>{selected.tag}</h5>
+                  <Icon icon="caret-down" />
+                </Row>
+              </Button>
+            </Popover>
+          </Row>
+          <Row center="xs" middle="xs">
+            <Button minimal style={{fontSize: '10px', height: '100%'}}
+              icon={<Icon icon={resolvedIcon as any} size={10} />}
+              className="p-0">
+              {resolvedLanguage}
             </Button>
-          </Row>}
-          {language && <Row center="xs" middle="xs">
-            <Button minimal style={{fontSize: '10px', height: '100%'}} icon={<Icon icon="circle" size={10} />} className="p-0">
-              {language}
-            </Button>
-          </Row>}
+          </Row>
         </Col>
       </Row>
     </Col>}
@@ -176,18 +242,21 @@ const LibrariesView = ({ data }: { data: LibrariesChild }) => <>
   </Row>
 </>
 
-const FileChildView = ({ file }: { file: FileChild }) => {
+const FileChildView = ({ file, defaultLanguage, defaultLanguageIcon }: { file: FileChild; defaultLanguage?: string; defaultLanguageIcon?: string }) => {
   const icon = file.icon || 'circle';
-  const hasControls = file.version || file.language;
+  const hasVersions = file.versions && file.versions.length > 0;
+  const fileLang = file.language || defaultLanguage;
+  const fileIcon = file.languageIcon || defaultLanguageIcon;
   return <>
-    {hasControls ? (
-      <Row><Language version={file.version} language={file.language}>
-        <Icon icon={icon as any} size={14} /><span>{file.name}</span>
+    {hasVersions ? (
+      <Row><Language versions={file.versions} defaultLanguage={fileLang} defaultLanguageIcon={fileIcon}>
+        <Icon icon={icon as any} size={14} />
+        <FileName name={file.name} library={file.library} />
       </Language></Row>
     ) : (
       <Row middle="xs" className="child-pr-3">
-        <Icon icon={icon as any} size={14} className={file.disabled ? 'bp5-text-disabled' : ''} />
-        <span className={file.disabled ? 'bp5-text-disabled' : ''}>{file.name}</span>
+        <Icon icon={icon as any} size={14} className="bp5-text-disabled" />
+        <FileName name={file.name} library={file.library} />
       </Row>
     )}
     {file.snippet && <Snippet text={file.snippet} />}
@@ -196,11 +265,11 @@ const FileChildView = ({ file }: { file: FileChild }) => {
 
 const ProjectEntryView = ({ project }: { project: ProjectEntry }) => {
   const icon = project.icon || 'circle';
-  const hasControls = project.version || project.language;
+  const hasVersions = project.versions && project.versions.length > 0;
   return <>
     <Row middle="xs" between="xs">
-      {hasControls ? (
-        <Language version={project.version} language={project.language}>
+      {hasVersions ? (
+        <Language versions={project.versions} defaultLanguage={project.language} defaultLanguageIcon={project.languageIcon}>
           <Icon icon={icon as any} size={16} />
           <h3>{project.name}</h3>
         </Language>
@@ -217,7 +286,7 @@ const ProjectEntryView = ({ project }: { project: ProjectEntry }) => {
       <Col xs={12} className="pl-8">
         {project.children.map((child, i) =>
           child.type === 'file'
-            ? <FileChildView key={i} file={child} />
+            ? <FileChildView key={i} file={child} defaultLanguage={project.language} defaultLanguageIcon={project.languageIcon} />
             : <LibrariesView key={i} data={child} />
         )}
       </Col>
