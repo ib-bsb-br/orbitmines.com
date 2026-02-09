@@ -4,7 +4,8 @@ import {Torus} from '@react-three/drei';
 import {ACESFilmicToneMapping, SRGBColorSpace} from 'three';
 import {Vertex, Continuation, Line, torus, add, line} from './archive/2023.OnOrbits';
 import WEBGL from 'three/examples/jsm/capabilities/WebGL';
-import isWebGLAvailable = WEBGL.isWebGLAvailable;
+
+const HAS_WEBGL = WEBGL.isWebGLAvailable();
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -12,6 +13,7 @@ const SCALE = 1.5;
 const SPACING_X = 40;
 const BRANCH_SPACING = 50;
 const CONT_OFFSET = 20;
+const VERT_AMP = 3; // Amplify vertical component for torus clip points
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -556,14 +558,26 @@ const reducer = (state: GraphState, action: Action): GraphState => {
   }
 };
 
+// Compute clip point on torus: amplify vertical component so angled connections
+// clip near top/bottom of the torus, horizontal ones stay at the side.
+const torusClip = (contPos: Vec3, nodePos: Vec3, fallbackDirX = 1): Vec3 => {
+  const dx = contPos[0] - nodePos[0];
+  const dy = (contPos[1] - nodePos[1]) * VERT_AMP;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const dirX = dist > 0 ? dx / dist : fallbackDirX;
+  const dirY = dist > 0 ? dy / dist : 0;
+  return [contPos[0] - dirX * torus.radius, contPos[1] - dirY * torus.radius, 0];
+};
+
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 const CursorIndicator = ({position, isPrimary}: { position: Vec3; isPrimary: boolean }) => {
   const ref = useRef<any>(null);
-  useFrame(({clock}) => {
+  useFrame(({clock, invalidate}) => {
     if (ref.current) {
       const s = 1 + Math.sin(clock.getElapsedTime() * 4) * 0.15;
       ref.current.scale.set(s, s, s);
+      invalidate();
     }
   });
   return (
@@ -668,7 +682,7 @@ const EventPlane = ({dispatch, state, layout}: {
 
   return (
     <mesh
-      position={[0, 0, -10]}
+      position={[0, 0, 1]}
       onPointerDown={(e) => {
         e.stopPropagation();
         const localPos = toLocal(e.point);
@@ -807,31 +821,21 @@ const GraphRenderer = ({state, layout}: {
             <Vertex position={pos} color={nodeColor}/>
             {initDangling && (() => {
               const contPos = state.contPositionOverrides[node.initialCont] ?? add(pos, [-CONT_OFFSET, 0, 0]);
-              const dx = contPos[0] - pos[0];
-              const dy = contPos[1] - pos[1];
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const dirX = dist > 0 ? dx / dist : -1;
-              const dirY = dist > 0 ? dy / dist : 0;
-              const lineEnd: Vec3 = [contPos[0] - dirX * torus.radius, contPos[1] - dirY * torus.radius, 0];
+              const clipPt = torusClip(contPos, pos, -1);
               return (
                 <>
                   <Continuation position={contPos} color={initColor}/>
-                  <Line start={lineEnd} end={pos} scale={scale} color={initColor}/>
+                  <Line start={clipPt} end={pos} scale={scale} color={initColor}/>
                 </>
               );
             })()}
             {termDangling && (() => {
               const contPos = state.contPositionOverrides[node.terminalCont] ?? add(pos, [CONT_OFFSET, 0, 0]);
-              const dx = contPos[0] - pos[0];
-              const dy = contPos[1] - pos[1];
-              const dist = Math.sqrt(dx * dx + dy * dy);
-              const dirX = dist > 0 ? dx / dist : 1;
-              const dirY = dist > 0 ? dy / dist : 0;
-              const lineEnd: Vec3 = [contPos[0] - dirX * torus.radius, contPos[1] - dirY * torus.radius, 0];
+              const clipPt = torusClip(contPos, pos, 1);
               return (
                 <>
                   <Continuation position={contPos} color={termColor}/>
-                  <Line start={lineEnd} end={pos} scale={scale} color={termColor}/>
+                  <Line start={clipPt} end={pos} scale={scale} color={termColor}/>
                 </>
               );
             })()}
@@ -860,26 +864,15 @@ const GraphRenderer = ({state, layout}: {
         ];
         const contPos = state.contPositionOverrides[edge.id] ?? defaultContPos;
 
-        // Per-segment direction vectors — lines aim at torus center, clip at torus.radius
-        const dx1 = contPos[0] - fromNodePos[0];
-        const dy1 = contPos[1] - fromNodePos[1];
-        const dist1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
-        const dir1X = dist1 > 0 ? dx1 / dist1 : 1;
-        const dir1Y = dist1 > 0 ? dy1 / dist1 : 0;
-        const lineEnd1: Vec3 = [contPos[0] - dir1X * torus.radius, contPos[1] - dir1Y * torus.radius, 0];
-
-        const dx2 = contPos[0] - toNodePos[0];
-        const dy2 = contPos[1] - toNodePos[1];
-        const dist2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
-        const dir2X = dist2 > 0 ? dx2 / dist2 : 1;
-        const dir2Y = dist2 > 0 ? dy2 / dist2 : 0;
-        const lineStart2: Vec3 = [contPos[0] - dir2X * torus.radius, contPos[1] - dir2Y * torus.radius, 0];
+        // Clip points on torus — amplified vertical for smooth curve entry
+        const clipPt1 = torusClip(contPos, fromNodePos);
+        const clipPt2 = torusClip(contPos, toNodePos);
 
         return (
           <group key={edge.id}>
-            <Line start={fromNodePos} end={lineEnd1} scale={scale} color={edgeColor}/>
+            <Line start={fromNodePos} end={clipPt1} scale={scale} color={edgeColor}/>
             <Continuation position={contPos} color={edgeColor}/>
-            <Line start={toNodePos} end={lineStart2} scale={scale} color={edgeColor}/>
+            <Line start={toNodePos} end={clipPt2} scale={scale} color={edgeColor}/>
           </group>
         );
       })}
@@ -908,6 +901,9 @@ const IDE = () => {
     [state.nodes, state.continuations, state.edges, state.positionOverrides]
   );
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
@@ -915,7 +911,7 @@ const IDE = () => {
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          if (state.interaction.mode === 'normal') {
+          if (stateRef.current.interaction.mode === 'normal') {
             if (e.shiftKey) {
               dispatch({type: 'ADD_VERTEX_BRANCH'});
             } else {
@@ -944,9 +940,9 @@ const IDE = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [state]);
+  }, []);
 
-  if (!isWebGLAvailable()) {
+  if (!HAS_WEBGL) {
     return <div style={{color: 'white', padding: 20}}>WebGL is not available</div>;
   }
 
@@ -967,7 +963,6 @@ const IDE = () => {
           powerPreference: 'high-performance',
           outputColorSpace: SRGBColorSpace,
           toneMapping: ACESFilmicToneMapping,
-          preserveDrawingBuffer: true,
         }}
         camera={{
           fov: 70,
@@ -978,7 +973,7 @@ const IDE = () => {
         orthographic
         dpr={[1, 2]}
         linear={false}
-        frameloop="always"
+        frameloop="demand"
         resize={{scroll: true, debounce: {scroll: 50, resize: 0}}}
         eventPrefix="offset"
       >
