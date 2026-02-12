@@ -168,19 +168,21 @@ const string = (node: ReactNode): string => {
 }
 
 const Shell = ({children}: Children) => {
-  return <span style={{textAlign: 'left'}}>
-    <Highlight prism={ReactPrism} theme={themes.oneDark} code={string(children)} language="bash">
-    {({className, style, tokens, getLineProps, getTokenProps}) => (
-      <>
-        {tokens.map((line, i) => (
-          <div {...getLineProps({line, key: i})}>
-            {line.map((token, key) => <span {...getTokenProps({token, key})} />)}
-          </div>
-        ))}
-      </>
-    )}
-  </Highlight>
-  </span>
+  return <Block>
+    <span style={{textAlign: 'left'}}>
+      <Highlight prism={ReactPrism} theme={themes.oneDark} code={string(children)} language="bash">
+      {({className, style, tokens, getLineProps, getTokenProps}) => (
+        <>
+          {tokens.map((line, i) => (
+            <div {...getLineProps({line, key: i})}>
+              {line.map((token, key) => <span {...getTokenProps({token, key})} />)}
+            </div>
+          ))}
+        </>
+      )}
+    </Highlight>
+    </span>
+  </Block>
 }
 
 export const CodeBlock = ({children}: Children) => {
@@ -292,12 +294,18 @@ const Almanac = () => {
 
         - (1) You can download Ether, which includes the Ray programming language by following this link:
         <DownloadButton/>
-        - (2) You can otherwise go to the <Reference is="reference" index={referenceCounter()} reference={{title: "GitHub Releases", link: "https://github.com/orbitmines/ray/releases"}} simple inline /> and download the relevant installer of the latest version.<BR/>
-        - (3) Or manually clone and build the application<BR/>
+        - (2) or running:
+        <Shell>
+          curl -fsSL https://ether.orbitmines.com/install.sh | bash
+        </Shell>
+        - (3) You can otherwise go to the <Reference is="reference" index={referenceCounter()} reference={{title: "GitHub Releases", link: "https://github.com/orbitmines/ray/releases"}} simple inline /> and download the relevant installer of the latest version.<BR/>
+        - (4) Or manually clone and build the application<BR/>
         <Shell>
           git clone git@github.com:orbitmines/ray.git<BR/>
-          cd ray && ./install.sh
+          cd ray && ./install.sh --compile
         </Shell>
+
+        <span style={{textAlign: 'left'}} className="bp5-text-muted">Note that there is also a plugin available for <Reference is="reference" simple inline index={referenceCounter()} reference={{title: 'IntelliJ', link: 'https://plugins.jetbrains.com/plugin/29452-ether'}} /> and VS Code, you can find them in their respective marketplaces under the name 'Ether'.</span>
 
       </Section>
       <Section head="§2. Programming Fundamentals">
