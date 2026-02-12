@@ -39,7 +39,6 @@ const Minimap = () => {
               <Row center="xs">
                 <Col xs={12} style={{maxWidth: '1240px'}}><Row end="xs" middle="xs" className="child-px-5">
                   <Col><DownloadButton/></Col>
-                  <Col><LoginButton/></Col>
                 </Row></Col>
               </Row>
             </Col>
